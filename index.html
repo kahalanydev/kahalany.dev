@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kahalany.Dev — Custom Software Solutions</title>
+    <meta name="description" content="We build production-grade web apps, mobile apps, AI tools, and custom software solutions. From idea to deployed product.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+    <!-- NAV -->
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="#" class="nav-logo">
+                <span class="logo-bracket">{</span> kahalany<span class="logo-dot">.</span>dev <span class="logo-bracket">}</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="#work">Work</a>
+                <a href="#capabilities">Capabilities</a>
+                <a href="#process">Process</a>
+                <a href="#contact" class="nav-cta">Let's Talk</a>
+            </div>
+            <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-bg">
+            <div class="grid-lines"></div>
+        </div>
+        <div class="hero-content">
+            <div class="hero-badge">Available for new projects</div>
+            <h1>We build software<br>that <span class="hero-highlight" id="rotatingText">ships</span></h1>
+            <p class="hero-sub">Full-stack web apps, mobile apps, AI-powered tools, and custom platforms — taken from idea to live, deployed product.</p>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-num" data-count="12">0</span><span class="stat-plus">+</span>
+                    <span class="stat-label">Production Apps</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-num" data-count="6">0</span>
+                    <span class="stat-label">Tech Stacks</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-num" data-count="5">0</span>
+                    <span class="stat-label">Live Platforms</span>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a href="#work" class="btn btn-primary">See Our Work</a>
+                <a href="#contact" class="btn btn-secondary">Start a Project</a>
+            </div>
+        </div>
+        <div class="hero-scroll">
+            <div class="scroll-line"></div>
+        </div>
+    </section>
+
+    <!-- WORK / PORTFOLIO -->
+    <section class="section work" id="work">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Portfolio</span>
+                <h2>Built, deployed, <em>running in production</em></h2>
+                <p>Not mockups. Not prototypes. These are real applications used by real people.</p>
+            </div>
+
+            <div class="project-filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="web">Web Apps</button>
+                <button class="filter-btn" data-filter="mobile">Mobile</button>
+                <button class="filter-btn" data-filter="ai">AI / ML</button>
+                <button class="filter-btn" data-filter="wordpress">WordPress</button>
+            </div>
+
+            <div class="projects-grid">
+                <!-- NodeAI -->
+                <div class="project-card showcase" data-tags="web ai">
+                    <div class="mockup-browser" style="--m-accent: #3b82f6;">
+                        <div class="mockup-chrome">
+                            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                            <span class="mockup-url">nodeai.kahalany.dev</span>
+                        </div>
+                        <div class="mockup-screen mockup-nodeai">
+                            <div class="m-sidebar">
+                                <div class="m-logo-bar"></div>
+                                <div class="m-nav-item active"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                            </div>
+                            <div class="m-main">
+                                <div class="m-topbar"></div>
+                                <div class="m-cards-row">
+                                    <div class="m-stat-card"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card accent"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                </div>
+                                <div class="m-content-row">
+                                    <div class="m-map">
+                                        <div class="m-map-pin" style="top:25%;left:40%"></div>
+                                        <div class="m-map-pin" style="top:55%;left:60%"></div>
+                                        <div class="m-map-pin" style="top:40%;left:30%"></div>
+                                        <div class="m-map-ring" style="top:20%;left:35%"></div>
+                                        <div class="m-map-ring" style="top:50%;left:55%"></div>
+                                    </div>
+                                    <div class="m-table">
+                                        <div class="m-table-header"></div>
+                                        <div class="m-table-row"></div>
+                                        <div class="m-table-row"></div>
+                                        <div class="m-table-row"></div>
+                                        <div class="m-table-row"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>Next.js</span><span>Supabase</span><span>TypeScript</span><span>Shopify API</span>
+                            </div>
+                            <span class="project-badge">Live</span>
+                        </div>
+                        <h3>NodeAI</h3>
+                        <p>Smart distribution platform with AI-powered demand analysis. 4 portals (Admin, Brand, 3PL, Terminal), Shopify integration, realtime WebSocket updates, barcode scanning, and an ML "Brain" engine that analyzes thousands of orders to optimize inventory placement.</p>
+                        <div class="project-features">
+                            <span>17-table database</span>
+                            <span>18 React hooks</span>
+                            <span>Shopify OAuth</span>
+                            <span>Demand heatmaps</span>
+                            <span>SMS notifications</span>
+                            <span>PWA</span>
+                        </div>
+                        <a href="https://nodeai.kahalany.dev" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                    </div>
+                </div>
+
+                <!-- Predictable -->
+                <div class="project-card showcase" data-tags="ai web">
+                    <div class="mockup-browser" style="--m-accent: #10b981;">
+                        <div class="mockup-chrome">
+                            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                            <span class="mockup-url">predictable.kahalany.dev</span>
+                        </div>
+                        <div class="mockup-screen mockup-predictable">
+                            <div class="m-sidebar dark">
+                                <div class="m-logo-bar"></div>
+                                <div class="m-nav-item active"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                            </div>
+                            <div class="m-main dark">
+                                <div class="m-topbar"></div>
+                                <div class="m-verdict-banner">
+                                    <div class="m-score-circle"></div>
+                                    <div class="m-verdict-text">
+                                        <div class="m-verdict-line w70"></div>
+                                        <div class="m-verdict-line w50"></div>
+                                    </div>
+                                </div>
+                                <div class="m-chart-area">
+                                    <svg viewBox="0 0 200 60" preserveAspectRatio="none" class="m-chart-line">
+                                        <path d="M0,50 C20,48 40,45 60,35 C80,25 100,30 120,20 C140,10 160,15 180,8 L200,5" fill="none" stroke="#10b981" stroke-width="2"/>
+                                        <path d="M0,50 C20,48 40,45 60,35 C80,25 100,30 120,20 C140,10 160,15 180,8 L200,5 L200,60 L0,60Z" fill="url(#greenGrad)" opacity="0.15"/>
+                                        <defs><linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>
+                                    </svg>
+                                </div>
+                                <div class="m-cards-row">
+                                    <div class="m-score-card"><div class="m-mini-ring"></div><div class="m-score-label"></div></div>
+                                    <div class="m-score-card"><div class="m-mini-ring green"></div><div class="m-score-label"></div></div>
+                                    <div class="m-score-card"><div class="m-mini-ring amber"></div><div class="m-score-label"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>React</span><span>Python</span><span>FastAPI</span><span>ML</span>
+                            </div>
+                            <span class="project-badge">Live</span>
+                        </div>
+                        <h3>Predictable</h3>
+                        <p>AI-powered stock market analysis platform. Technical analysis (RSI, MACD, Bollinger), fundamental scoring, and ML predictions using a Random Forest + Gradient Boosting + Linear Regression ensemble. Generates investment theses and multi-horizon forecasts with confidence intervals.</p>
+                        <div class="project-features">
+                            <span>3-model ML ensemble</span>
+                            <span>240+ stock tickers</span>
+                            <span>12 sector benchmarks</span>
+                            <span>Budget scanner</span>
+                            <span>Thesis generator</span>
+                            <span>Dark/light theme</span>
+                        </div>
+                        <a href="https://predictable.kahalany.dev" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                    </div>
+                </div>
+
+                <!-- OLAMI -->
+                <div class="project-card showcase" data-tags="wordpress web">
+                    <div class="mockup-browser" style="--m-accent: #8b5cf6;">
+                        <div class="mockup-chrome">
+                            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                            <span class="mockup-url">olami-command-center</span>
+                        </div>
+                        <div class="mockup-screen mockup-olami">
+                            <div class="m-sidebar purple">
+                                <div class="m-logo-bar"></div>
+                                <div class="m-nav-item active"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                            </div>
+                            <div class="m-main">
+                                <div class="m-topbar wide"></div>
+                                <div class="m-cards-row">
+                                    <div class="m-stat-card purple"><div class="m-stat-icon">48</div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card"><div class="m-stat-icon">12</div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card"><div class="m-stat-icon">156</div><div class="m-stat-lbl"></div></div>
+                                </div>
+                                <div class="m-checkin-grid">
+                                    <div class="m-checkin-row header"></div>
+                                    <div class="m-checkin-row"><span class="m-check"></span></div>
+                                    <div class="m-checkin-row"><span class="m-check checked"></span></div>
+                                    <div class="m-checkin-row"><span class="m-check checked"></span></div>
+                                    <div class="m-checkin-row"><span class="m-check"></span></div>
+                                    <div class="m-checkin-row"><span class="m-check checked"></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>WordPress</span><span>PHP</span><span>JavaScript</span><span>AJAX</span>
+                            </div>
+                            <span class="project-badge purple">V5.36</span>
+                        </div>
+                        <h3>OLAMI Master Manager</h3>
+                        <p>Enterprise-grade WordPress plugin for managing student programs, events, check-ins, and gamification. Handles RSVPs, approval workflows, multi-template emails, bulk operations, leaderboards, an arena with a custom HTML5 Canvas game, and a full coin economy with a store.</p>
+                        <div class="project-features">
+                            <span>35+ PHP modules</span>
+                            <span>Canvas game engine</span>
+                            <span>Approval workflows</span>
+                            <span>Bulk email system</span>
+                            <span>Coin economy</span>
+                            <span>Leaderboards</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TorahTracker -->
+                <div class="project-card showcase" data-tags="mobile web">
+                    <div class="mockup-phone" style="--m-accent: #f59e0b;">
+                        <div class="phone-frame">
+                            <div class="phone-notch"></div>
+                            <div class="phone-screen mockup-torah">
+                                <div class="m-app-header">
+                                    <div class="m-app-title"></div>
+                                </div>
+                                <div class="m-progress-ring">
+                                    <svg viewBox="0 0 80 80">
+                                        <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(245,158,11,0.15)" stroke-width="6"/>
+                                        <circle cx="40" cy="40" r="34" fill="none" stroke="#f59e0b" stroke-width="6" stroke-dasharray="160 214" stroke-linecap="round" transform="rotate(-90 40 40)"/>
+                                    </svg>
+                                    <span class="m-ring-text">75%</span>
+                                </div>
+                                <div class="m-streak-bar">
+                                    <div class="m-flame"></div>
+                                    <div class="m-streak-text"></div>
+                                </div>
+                                <div class="m-session-list">
+                                    <div class="m-session-item"><span class="m-dot gold"></span><div class="m-session-lines"><div class="m-line w70"></div><div class="m-line w40"></div></div><span class="m-time"></span></div>
+                                    <div class="m-session-item"><span class="m-dot blue"></span><div class="m-session-lines"><div class="m-line w60"></div><div class="m-line w35"></div></div><span class="m-time"></span></div>
+                                    <div class="m-session-item"><span class="m-dot green"></span><div class="m-session-lines"><div class="m-line w80"></div><div class="m-line w45"></div></div><span class="m-time"></span></div>
+                                </div>
+                                <div class="m-bottom-nav">
+                                    <span class="m-tab"></span>
+                                    <span class="m-tab active"></span>
+                                    <span class="m-tab"></span>
+                                    <span class="m-tab"></span>
+                                    <span class="m-tab"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>PWA</span><span>Capacitor</span><span>iOS</span><span>Android</span><span>PHP</span>
+                            </div>
+                            <span class="project-badge amber">App Store</span>
+                        </div>
+                        <h3>Torah Tracker</h3>
+                        <p>Cross-platform mobile app for tracking daily Torah learning. Published on the App Store and Google Play. Features spaced repetition review scheduling, learning plan management, streak tracking, coverage maps for the entire Talmud, and push notifications.</p>
+                        <div class="project-features">
+                            <span>iOS + Android</span>
+                            <span>Spaced repetition</span>
+                            <span>Offline support</span>
+                            <span>Push notifications</span>
+                            <span>Coverage maps</span>
+                            <span>Service worker</span>
+                        </div>
+                        <a href="https://torahtracker.app" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                    </div>
+                </div>
+
+                <!-- ShipHeroAI -->
+                <div class="project-card showcase" data-tags="ai web">
+                    <div class="mockup-browser" style="--m-accent: #ef4444;">
+                        <div class="mockup-chrome">
+                            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                            <span class="mockup-url">shiphero-ai</span>
+                        </div>
+                        <div class="mockup-screen mockup-chat">
+                            <div class="m-sidebar red">
+                                <div class="m-logo-bar"></div>
+                                <div class="m-nav-item active"></div>
+                                <div class="m-nav-item"></div>
+                                <div class="m-nav-item"></div>
+                            </div>
+                            <div class="m-chat-main">
+                                <div class="m-chat-header"></div>
+                                <div class="m-chat-messages">
+                                    <div class="m-msg user"><div class="m-msg-bubble user-b"></div></div>
+                                    <div class="m-msg ai">
+                                        <div class="m-msg-bubble ai-b">
+                                            <div class="m-line w90"></div>
+                                            <div class="m-line w70"></div>
+                                            <div class="m-line w80"></div>
+                                        </div>
+                                    </div>
+                                    <div class="m-msg user"><div class="m-msg-bubble user-b short"></div></div>
+                                    <div class="m-msg ai">
+                                        <div class="m-msg-bubble ai-b">
+                                            <div class="m-tool-call"></div>
+                                            <div class="m-line w60"></div>
+                                            <div class="m-line w85"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="m-chat-input"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>Python</span><span>FastAPI</span><span>Claude API</span><span>OpenAI</span><span>Gemini</span>
+                            </div>
+                            <span class="project-badge red">76+ Tools</span>
+                        </div>
+                        <h3>ShipHero AI</h3>
+                        <p>AI-powered warehouse management assistant. Full rewrite from PHP to Python/FastAPI. Supports 3 LLM providers (Claude, OpenAI, Gemini) with 76+ AI tools across 14 modules. Features a conversational chat interface for querying and managing warehouse operations.</p>
+                        <div class="project-features">
+                            <span>76+ AI tools</span>
+                            <span>3 LLM providers</span>
+                            <span>AES-256-GCM encryption</span>
+                            <span>Admin panel</span>
+                            <span>Mobile responsive</span>
+                            <span>Docker deploy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Davenen -->
+                <div class="project-card showcase" data-tags="web">
+                    <div class="mockup-browser" style="--m-accent: #6366f1;">
+                        <div class="mockup-chrome">
+                            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                            <span class="mockup-url">davenen.kahalany.dev</span>
+                        </div>
+                        <div class="mockup-screen mockup-davenen">
+                            <div class="m-hero-section">
+                                <div class="m-hero-title"></div>
+                                <div class="m-hero-sub"></div>
+                                <div class="m-hero-btn"></div>
+                            </div>
+                            <div class="m-partner-cards">
+                                <div class="m-partner-card">
+                                    <div class="m-avatar"></div>
+                                    <div class="m-partner-info"><div class="m-line w60"></div><div class="m-line w40"></div></div>
+                                    <div class="m-day-counter">Day 18/40</div>
+                                </div>
+                                <div class="m-partner-card">
+                                    <div class="m-avatar"></div>
+                                    <div class="m-partner-info"><div class="m-line w50"></div><div class="m-line w35"></div></div>
+                                    <div class="m-day-counter">Day 32/40</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>Laravel</span><span>PHP</span><span>MySQL</span><span>Email</span>
+                            </div>
+                            <span class="project-badge">Live</span>
+                        </div>
+                        <h3>Davenen Partner</h3>
+                        <p>Prayer partner matching platform with 40-day cycle tracking. Automated matching algorithm, admin dashboard with funnel analytics, streak counters, testimonial system, re-engagement emails, and a security layer with IP blocking, spam detection, and rate limiting.</p>
+                        <div class="project-features">
+                            <span>Matching algorithm</span>
+                            <span>40-day cycles</span>
+                            <span>Funnel analytics</span>
+                            <span>Email automation</span>
+                            <span>Spam protection</span>
+                            <span>Testimonials</span>
+                        </div>
+                        <a href="https://davenen.kahalany.dev" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                    </div>
+                </div>
+
+                <!-- PassaicCliftonGemach -->
+                <div class="project-card showcase" data-tags="web">
+                    <div class="mockup-browser" style="--m-accent: #f59e0b;">
+                        <div class="mockup-chrome">
+                            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                            <span class="mockup-url">gemach-lender-portal</span>
+                        </div>
+                        <div class="mockup-screen mockup-gemach">
+                            <div class="m-main full">
+                                <div class="m-topbar amber"></div>
+                                <div class="m-gemach-hero">
+                                    <div class="m-balance-big">$12,450</div>
+                                    <div class="m-balance-label"></div>
+                                </div>
+                                <div class="m-cards-row">
+                                    <div class="m-stat-card amber"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                    <div class="m-stat-card"><div class="m-stat-val"></div><div class="m-stat-lbl"></div></div>
+                                </div>
+                                <div class="m-chart-area amber">
+                                    <svg viewBox="0 0 200 50" preserveAspectRatio="none" class="m-chart-line">
+                                        <path d="M0,40 C30,38 50,30 80,25 C110,20 130,22 160,15 L200,10" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                                        <path d="M0,40 C30,38 50,30 80,25 C110,20 130,22 160,15 L200,10 L200,50 L0,50Z" fill="#f59e0b" opacity="0.1"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>Laravel</span><span>PHP</span><span>MySQL</span><span>Charts</span>
+                            </div>
+                            <span class="project-badge amber">Live</span>
+                        </div>
+                        <h3>Community Lending Platform</h3>
+                        <p>Full-featured Gemach (interest-free loan fund) management system. Lender portal with personalized dashboards, balance tracking, contribution history with running totals, balance line graphs, and a "Contribute More" request flow. Rep system for community outreach.</p>
+                        <div class="project-features">
+                            <span>Lender dashboard</span>
+                            <span>Balance tracking</span>
+                            <span>Contribution workflow</span>
+                            <span>Transaction history</span>
+                            <span>Rep system</span>
+                            <span>Admin panel</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Claude Code UI -->
+                <div class="project-card showcase" data-tags="ai">
+                    <div class="mockup-browser" style="--m-accent: #d946ef;">
+                        <div class="mockup-chrome">
+                            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                            <span class="mockup-url">Claude Code UI.exe</span>
+                        </div>
+                        <div class="mockup-screen mockup-ccui">
+                            <div class="m-sidebar magenta">
+                                <div class="m-logo-bar"></div>
+                                <div class="m-file-tree">
+                                    <div class="m-file-item folder"></div>
+                                    <div class="m-file-item indent"></div>
+                                    <div class="m-file-item indent"></div>
+                                    <div class="m-file-item folder"></div>
+                                    <div class="m-file-item indent"></div>
+                                </div>
+                            </div>
+                            <div class="m-chat-main dark">
+                                <div class="m-tab-bar">
+                                    <span class="m-tab-item active"></span>
+                                    <span class="m-tab-item"></span>
+                                    <span class="m-tab-item"></span>
+                                </div>
+                                <div class="m-chat-messages">
+                                    <div class="m-msg ai">
+                                        <div class="m-msg-bubble ai-b">
+                                            <div class="m-code-block">
+                                                <div class="m-line w50 code"></div>
+                                                <div class="m-line w70 code"></div>
+                                                <div class="m-line w40 code"></div>
+                                            </div>
+                                            <div class="m-line w80"></div>
+                                        </div>
+                                    </div>
+                                    <div class="m-msg user"><div class="m-msg-bubble user-b"></div></div>
+                                    <div class="m-msg ai">
+                                        <div class="m-msg-bubble ai-b">
+                                            <div class="m-diff-block">
+                                                <div class="m-diff-del"></div>
+                                                <div class="m-diff-add"></div>
+                                                <div class="m-diff-add"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="m-chat-input"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="project-body">
+                        <div class="project-meta">
+                            <div class="project-tags">
+                                <span>Electron</span><span>Node.js</span><span>Vanilla JS</span>
+                            </div>
+                            <span class="project-badge magenta">Desktop</span>
+                        </div>
+                        <h3>Claude Code UI</h3>
+                        <p>Custom Electron desktop app wrapping Claude Code CLI with a polished chat interface. Multi-project tabs, 4 themes, file explorer, git diff viewer, embedded browser preview, and persistent chat history — all communicating via bidirectional stream-JSON IPC.</p>
+                        <div class="project-features">
+                            <span>Electron desktop</span>
+                            <span>Stream-JSON IPC</span>
+                            <span>Multi-project tabs</span>
+                            <span>Git diff viewer</span>
+                            <span>Browser preview</span>
+                            <span>4 themes</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CAPABILITIES -->
+    <section class="section capabilities" id="capabilities">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Capabilities</span>
+                <h2>Whatever the stack, <em>we've built with it</em></h2>
+            </div>
+
+            <div class="caps-grid">
+                <div class="cap-card">
+                    <div class="cap-icon" style="--accent: #3b82f6;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"/></svg>
+                    </div>
+                    <h3>Full-Stack Web Apps</h3>
+                    <p>React, Next.js, Laravel, FastAPI, Supabase, MySQL, SQLite. From database schema to deployed product.</p>
+                    <div class="cap-techs">
+                        <span>React</span><span>Next.js</span><span>Laravel</span><span>FastAPI</span><span>Supabase</span>
+                    </div>
+                </div>
+
+                <div class="cap-card">
+                    <div class="cap-icon" style="--accent: #10b981;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/></svg>
+                    </div>
+                    <h3>Mobile Apps</h3>
+                    <p>Native iOS + Android apps via Capacitor, PWAs with offline support, push notifications, and App Store deployment.</p>
+                    <div class="cap-techs">
+                        <span>iOS</span><span>Android</span><span>Capacitor</span><span>PWA</span><span>Push Notifications</span>
+                    </div>
+                </div>
+
+                <div class="cap-card">
+                    <div class="cap-icon" style="--accent: #8b5cf6;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/></svg>
+                    </div>
+                    <h3>AI & Machine Learning</h3>
+                    <p>Claude, OpenAI, and Gemini integration. ML prediction models, AI tool systems, and intelligent automation.</p>
+                    <div class="cap-techs">
+                        <span>Claude API</span><span>OpenAI</span><span>Gemini</span><span>scikit-learn</span><span>76+ AI tools</span>
+                    </div>
+                </div>
+
+                <div class="cap-card">
+                    <div class="cap-icon" style="--accent: #f59e0b;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/></svg>
+                    </div>
+                    <h3>WordPress & Plugins</h3>
+                    <p>Custom plugins, complex admin panels, AJAX-driven UIs, WooCommerce integration, and Elementor widgets.</p>
+                    <div class="cap-techs">
+                        <span>WordPress</span><span>PHP</span><span>Custom Plugins</span><span>Elementor</span><span>AJAX</span>
+                    </div>
+                </div>
+
+                <div class="cap-card">
+                    <div class="cap-icon" style="--accent: #ef4444;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"/></svg>
+                    </div>
+                    <h3>Infrastructure & DevOps</h3>
+                    <p>Docker, Coolify, Hetzner VPS, Traefik, auto-deploy pipelines, staging/production environments, SSL.</p>
+                    <div class="cap-techs">
+                        <span>Docker</span><span>Coolify</span><span>Hetzner</span><span>Traefik</span><span>CI/CD</span>
+                    </div>
+                </div>
+
+                <div class="cap-card">
+                    <div class="cap-icon" style="--accent: #06b6d4;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
+                    </div>
+                    <h3>Desktop Apps</h3>
+                    <p>Electron apps with custom UIs, IPC communication, file system access, and native OS integration.</p>
+                    <div class="cap-techs">
+                        <span>Electron</span><span>Node.js</span><span>IPC</span><span>Stream JSON</span><span>Packaging</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PROCESS -->
+    <section class="section process" id="process">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">How We Work</span>
+                <h2>From idea to <em>live product</em></h2>
+                <p>We don't just write code. We ship complete, deployed solutions.</p>
+            </div>
+
+            <div class="process-steps">
+                <div class="process-step">
+                    <div class="step-num">01</div>
+                    <div class="step-content">
+                        <h3>Understand</h3>
+                        <p>We learn your business, your users, and what success looks like. No generic solutions — every build starts with the real problem.</p>
+                    </div>
+                </div>
+                <div class="process-step">
+                    <div class="step-num">02</div>
+                    <div class="step-content">
+                        <h3>Architect</h3>
+                        <p>Pick the right stack for your needs. Design the database, map the features, plan the deployment. Get alignment before writing a single line.</p>
+                    </div>
+                </div>
+                <div class="process-step">
+                    <div class="step-num">03</div>
+                    <div class="step-content">
+                        <h3>Build</h3>
+                        <p>Rapid, iterative development with AI-augmented workflows. You see working builds as we go — not a reveal at the end.</p>
+                    </div>
+                </div>
+                <div class="process-step">
+                    <div class="step-num">04</div>
+                    <div class="step-content">
+                        <h3>Deploy & Support</h3>
+                        <p>Docker, CI/CD, staging environments, production deployment. We set up the infrastructure and stick around to iterate.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA / CONTACT -->
+    <section class="section contact" id="contact">
+        <div class="container">
+            <div class="contact-card">
+                <div class="contact-content">
+                    <span class="section-tag">Start a Project</span>
+                    <h2>Got an idea?<br>Let's build it.</h2>
+                    <p>Whether it's a web app, mobile app, AI tool, WordPress plugin, or something entirely custom — we'll take it from concept to production.</p>
+                    <div class="contact-methods">
+                        <a href="mailto:hello@kahalany.dev" class="contact-method">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                            <div>
+                                <span class="contact-label">Email</span>
+                                <span class="contact-value">hello@kahalany.dev</span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+                <div class="contact-visual">
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-dot"></span>
+                            <span class="code-dot"></span>
+                            <span class="code-dot"></span>
+                            <span class="code-title">new-project.ts</span>
+                        </div>
+                        <pre><code><span class="code-kw">const</span> <span class="code-var">project</span> = {
+  <span class="code-key">idea</span>: <span class="code-str">"Your vision here"</span>,
+  <span class="code-key">stack</span>: <span class="code-fn">pickBestFit</span>(),
+  <span class="code-key">timeline</span>: <span class="code-str">"weeks, not months"</span>,
+  <span class="code-key">deployed</span>: <span class="code-bool">true</span>,
+};
+
+<span class="code-kw">await</span> <span class="code-fn">kahalany</span>.<span class="code-fn">build</span>(<span class="code-var">project</span>);</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container footer-inner">
+            <div class="footer-logo">
+                <span class="logo-bracket">{</span> kahalany<span class="logo-dot">.</span>dev <span class="logo-bracket">}</span>
+            </div>
+            <div class="footer-links">
+                <a href="#work">Work</a>
+                <a href="#capabilities">Capabilities</a>
+                <a href="#contact">Contact</a>
+            </div>
+            <div class="footer-copy">&copy; 2026 Kahalany.Dev</div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
