@@ -424,6 +424,8 @@ img { max-width: 100%; display: block; }
 .project-badge.amber { background: rgba(245,158,11,0.15); color: #fbbf24; border-color: rgba(245,158,11,0.2); }
 .project-badge.red { background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.2); }
 .project-badge.magenta { background: rgba(217,70,239,0.15); color: #e879f9; border-color: rgba(217,70,239,0.2); }
+.project-badge.orange { background: rgba(249,115,22,0.15); color: #fb923c; border-color: rgba(249,115,22,0.2); }
+.project-badge.pink { background: rgba(236,72,153,0.15); color: #f472b6; border-color: rgba(236,72,153,0.2); }
 
 .project-body h3 {
     font-size: 1.3rem;
@@ -1094,6 +1096,213 @@ img { max-width: 100%; display: block; }
 }
 .mockup-gemach .m-cards-row { padding: 0 12px; }
 .mockup-gemach .m-chart-area { margin: 0 12px; flex: 1; }
+
+/* =============================================
+   MOCKUP: Hero Animator — Hero Builder
+   ============================================= */
+.mockup-hero-animator .m-main.full {
+    display: flex;
+    flex-direction: column;
+}
+.m-ha-hero {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.m-ha-bg-layers {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(249,115,22,0.06) 0%, rgba(234,88,12,0.03) 50%, transparent 100%);
+}
+.m-ha-layer {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 30% 40%, rgba(249,115,22,0.1) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 60%, rgba(251,146,60,0.06) 0%, transparent 50%);
+    animation: ha-ken-burns 8s ease-in-out infinite alternate;
+}
+@keyframes ha-ken-burns {
+    0% { transform: scale(1) translate(0, 0); }
+    100% { transform: scale(1.08) translate(-2%, -1%); }
+}
+.m-ha-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 16px;
+}
+.m-ha-title {
+    height: 14px;
+    width: 140px;
+    margin: 0 auto 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.14);
+}
+.m-ha-subtitle {
+    height: 6px;
+    width: 100px;
+    margin: 0 auto 14px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.07);
+}
+.m-ha-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+.m-ha-btn {
+    width: 50px;
+    height: 16px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.m-ha-btn.primary {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    border-color: transparent;
+}
+.m-ha-scroll-ind {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 24px;
+    border-radius: 10px;
+    border: 1.5px solid rgba(249,115,22,0.3);
+}
+.m-ha-scroll-ind::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 5px;
+    border-radius: 2px;
+    background: rgba(249,115,22,0.5);
+}
+.m-ha-controls {
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.4);
+    border-top: 1px solid rgba(249,115,22,0.15);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.m-ha-control-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.03);
+}
+.m-ha-control-item.active {
+    background: rgba(249,115,22,0.1);
+    border: 1px solid rgba(249,115,22,0.2);
+}
+.m-ha-icon {
+    font-size: 0.45rem;
+    color: rgba(249,115,22,0.7);
+    flex-shrink: 0;
+}
+.m-ha-timeline {
+    flex: 1;
+    margin-left: 4px;
+}
+.m-ha-track {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.04);
+    position: relative;
+}
+.m-ha-keyframe {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    width: 6px;
+    height: 6px;
+    background: #f97316;
+    border-radius: 1px;
+}
+
+/* =============================================
+   MOCKUP: SnapGrid Pro — Feed Grid
+   ============================================= */
+.mockup-snapgrid .m-main.full {
+    display: flex;
+    flex-direction: column;
+}
+.m-ji-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.m-ji-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ec4899, #f97316);
+    flex-shrink: 0;
+}
+.m-ji-stats {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+}
+.m-ji-stat {
+    text-align: center;
+}
+.m-ji-num {
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: rgba(255,255,255,0.7);
+    line-height: 1;
+    margin-bottom: 2px;
+}
+.m-ji-label {
+    height: 4px;
+    width: 24px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+}
+.m-ji-follow {
+    width: 44px;
+    height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #ec4899, #8b5cf6);
+    flex-shrink: 0;
+}
+.m-ji-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 2px;
+}
+.m-ji-photo {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.04);
+}
+.m-ji-photo.p1 { background: linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.1)); }
+.m-ji-photo.p2 { background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(236,72,153,0.08)); }
+.m-ji-photo.p3 { background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(16,185,129,0.08)); }
+.m-ji-photo.p4 { background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(59,130,246,0.08)); }
+.m-ji-photo.p5 { background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(245,158,11,0.08)); }
+.m-ji-photo.p6 { background: linear-gradient(135deg, rgba(236,72,153,0.12), rgba(249,115,22,0.08)); }
+.m-ji-photo.p7 { background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.08)); }
+.m-ji-photo.p8 { background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.12)); }
+.m-ji-photo.p9 { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(236,72,153,0.08)); }
 
 /* --- CAPABILITIES --- */
 .capabilities {
