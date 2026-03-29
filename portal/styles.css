@@ -26,6 +26,43 @@
   --sidebar-width: 240px;
 }
 
+[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f4f4f5;
+  --surface-2: #fafafa;
+  --surface-3: #f0f0f2;
+  --border: #e4e4e7;
+  --border-light: #d4d4d8;
+  --text: #18181b;
+  --text-secondary: #52525b;
+  --text-dim: #71717a;
+  --accent: #2563eb;
+  --accent-dim: rgba(37, 99, 235, 0.08);
+  --accent-border: rgba(37, 99, 235, 0.25);
+  --gradient: linear-gradient(135deg, #2563eb, #7c3aed);
+  --danger: #dc2626;
+  --danger-dim: rgba(220, 38, 38, 0.08);
+  --warning: #d97706;
+  --warning-dim: rgba(217, 119, 6, 0.08);
+  --success: #16a34a;
+  --success-dim: rgba(22, 163, 74, 0.08);
+}
+
+.theme-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 16px;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.theme-toggle-btn:hover { color: var(--text); border-color: var(--accent); }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {

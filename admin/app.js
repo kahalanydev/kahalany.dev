@@ -4,6 +4,9 @@
   const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
   const app = document.getElementById('app');
 
+  // Load saved theme
+  if (localStorage.getItem('admin_theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
+
   // ===== STATE =====
   const state = {
     token: localStorage.getItem('admin_token'),
@@ -326,6 +329,9 @@
           </ul>
           <div class="sidebar-bottom">
             <div class="sidebar-user">${escapeHtml(state.user?.email)}</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <button class="theme-toggle-btn" id="themeToggleAdmin" style="flex:1;justify-content:center">${document.documentElement.getAttribute('data-theme') === 'light' ? '\u2600 Light' : '\u{1F319} Dark'}</button>
+            </div>
             <button class="btn btn-secondary btn-sm" id="logoutBtn" style="width:100%">Logout</button>
           </div>
         </aside>
@@ -345,6 +351,13 @@
     if (toggle) toggle.addEventListener('click', () => {
       state.sidebarOpen = !state.sidebarOpen;
       $('#sidebar').classList.toggle('open', state.sidebarOpen);
+    });
+    const themeBtn = $('#themeToggleAdmin');
+    if (themeBtn) themeBtn.addEventListener('click', () => {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      if (isLight) { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('admin_theme', 'dark'); }
+      else { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('admin_theme', 'light'); }
+      render();
     });
   }
 
@@ -762,12 +775,14 @@
     `);
 
     try {
-      const [usersRes, oauthRes] = await Promise.all([
+      const [usersRes, oauthRes, smtpRes] = await Promise.all([
         api('/auth/users'),
-        api('/auth/oauth/config')
+        api('/auth/oauth/config'),
+        api('/auth/smtp/config')
       ]);
       const users = usersRes.data.users;
       const oauth = oauthRes.data;
+      const smtp = smtpRes.data;
 
       $('#mainContent').innerHTML = `
         <div class="page-header">
@@ -852,6 +867,42 @@
             </div>
           </form>
           ${oauth.google_oauth_enabled ? '<div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:var(--radius);font-size:12px;color:var(--text-dim)"><strong>Authorized redirect URI</strong> (add this in Google Cloud Console):<br><code style="color:var(--accent);font-family:var(--mono)">' + window.location.origin + '/api/auth/google/callback</code></div>' : ''}
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header"><span class="card-title">Email (SMTP)</span></div>
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+            Configure SMTP to send welcome emails with login credentials when creating users. Without this, passwords are only shown on screen.
+          </p>
+          <div id="smtpMsg"></div>
+          <form id="smtpForm">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+              <div class="form-group" style="margin-bottom:0">
+                <label>SMTP Host</label>
+                <input type="text" id="smtpHost" value="${escapeHtml(smtp.smtp_host)}" placeholder="smtp.gmail.com" style="font-family:var(--mono);font-size:12px">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label>Port</label>
+                <input type="text" id="smtpPort" value="${escapeHtml(smtp.smtp_port)}" placeholder="587" style="font-family:var(--mono);font-size:12px;max-width:100px">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label>Username</label>
+                <input type="text" id="smtpUser" value="${escapeHtml(smtp.smtp_user)}" placeholder="you@gmail.com" style="font-family:var(--mono);font-size:12px">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label>Password ${smtp.smtp_pass_set ? '<span class="badge badge-green" style="margin-left:6px;font-size:10px">set</span>' : ''}</label>
+                <input type="password" id="smtpPass" placeholder="${smtp.smtp_pass_set ? 'Leave blank to keep' : 'App password'}" style="font-family:var(--mono);font-size:12px">
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:16px">
+              <label>From Address</label>
+              <input type="text" id="smtpFrom" value="${escapeHtml(smtp.smtp_from)}" placeholder='"Kahalany.Dev" <hello@kahalany.dev>' style="font-family:var(--mono);font-size:12px">
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="submit" class="btn btn-primary" style="width:auto">Save SMTP</button>
+              <button type="button" class="btn btn-secondary" id="smtpTestBtn" style="width:auto">Send Test Email</button>
+            </div>
+          </form>
         </div>
       `;
 
@@ -938,6 +989,48 @@
           setTimeout(() => renderSettings(), 1500);
         } catch (err) {
           $('#oauthMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      });
+
+      // SMTP settings handler
+      $('#smtpForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const payload = {
+            smtp_host: $('#smtpHost').value,
+            smtp_port: $('#smtpPort').value,
+            smtp_user: $('#smtpUser').value,
+            smtp_from: $('#smtpFrom').value
+          };
+          const pass = $('#smtpPass').value;
+          if (pass) payload.smtp_pass = pass;
+
+          await api('/auth/smtp/config', { method: 'PUT', body: JSON.stringify(payload) });
+          $('#smtpMsg').innerHTML = `<div class="alert alert-success">SMTP settings saved</div>`;
+          setTimeout(() => renderSettings(), 1500);
+        } catch (err) {
+          $('#smtpMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      });
+
+      // SMTP test
+      $('#smtpTestBtn').addEventListener('click', async () => {
+        try {
+          // Save first, then test
+          const payload = {
+            smtp_host: $('#smtpHost').value,
+            smtp_port: $('#smtpPort').value,
+            smtp_user: $('#smtpUser').value,
+            smtp_from: $('#smtpFrom').value
+          };
+          const pass = $('#smtpPass').value;
+          if (pass) payload.smtp_pass = pass;
+          await api('/auth/smtp/config', { method: 'PUT', body: JSON.stringify(payload) });
+
+          const res = await api('/auth/smtp/test', { method: 'POST' });
+          $('#smtpMsg').innerHTML = `<div class="alert alert-success">${escapeHtml(res.data.message)}</div>`;
+        } catch (err) {
+          $('#smtpMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
       });
     } catch (err) {

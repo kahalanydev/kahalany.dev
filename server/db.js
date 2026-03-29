@@ -195,6 +195,18 @@ function initSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_suspicious_created ON suspicious_activity(created_at);');
   db.run('CREATE INDEX IF NOT EXISTS idx_suspicious_ip ON suspicious_activity(ip);');
 
+  // Contact form submissions
+  db.run(`
+    CREATE TABLE IF NOT EXISTS contact_submissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      message TEXT NOT NULL,
+      ip TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
   // ===== PORTAL TABLES =====
 
   db.run(`

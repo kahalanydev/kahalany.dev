@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { getDb, getJwtSecret } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { sendWelcomeEmail, sendPasswordResetEmail, getSmtpConfig } = require('../utils/email');
 
 const router = express.Router();
 
@@ -112,6 +113,11 @@ router.post('/users/:id/reset', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1, updated_at = datetime(\'now\') WHERE id = ?')
     .run(hash, targetId);
 
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const loginUrl = target.role === 'client' ? `${proto}://${host}/portal` : `${proto}://${host}/admin`;
+  sendPasswordResetEmail({ email: target.email, name: target.name, password, loginUrl });
+
   res.json({ success: true, data: { temporary_password: password } });
 });
 
@@ -142,6 +148,10 @@ router.post('/users', requireAuth, (req, res) => {
     'INSERT INTO users (email, password_hash, name, role, must_change_password) VALUES (?, ?, ?, ?, ?)'
   ).run(email.toLowerCase().trim(), hash, name || null, 'admin', 1);
 
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  sendWelcomeEmail({ email: email.toLowerCase().trim(), name, password, role: 'admin', loginUrl: `${proto}://${host}/admin` });
+
   res.json({
     success: true,
     data: {
@@ -167,6 +177,49 @@ router.delete('/users/:id', requireAuth, (req, res) => {
 
   db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
   res.json({ success: true, data: { message: 'User deleted' } });
+});
+
+// ===== SMTP CONFIG (admin only) =====
+
+router.get('/smtp/config', requireAuth, requireRole('admin'), (req, res) => {
+  const db = getDb();
+  const get = (key) => { const r = db.prepare("SELECT value FROM config WHERE key = ?").get(key); return r ? r.value : ''; };
+  res.json({ success: true, data: {
+    smtp_host: get('smtp_host'),
+    smtp_port: get('smtp_port') || '587',
+    smtp_user: get('smtp_user'),
+    smtp_pass_set: !!get('smtp_pass'),
+    smtp_from: get('smtp_from')
+  }});
+});
+
+router.put('/smtp/config', requireAuth, requireRole('admin'), (req, res) => {
+  const db = getDb();
+  const fields = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_from'];
+  for (const key of fields) {
+    if (req.body[key] !== undefined) {
+      const existing = db.prepare("SELECT value FROM config WHERE key = ?").get(key);
+      if (existing) db.prepare("UPDATE config SET value = ? WHERE key = ?").run(req.body[key], key);
+      else db.prepare("INSERT INTO config (key, value) VALUES (?, ?)").run(key, req.body[key]);
+    }
+  }
+  if (req.body.smtp_pass && req.body.smtp_pass !== '') {
+    const existing = db.prepare("SELECT value FROM config WHERE key = 'smtp_pass'").get();
+    if (existing) db.prepare("UPDATE config SET value = ? WHERE key = 'smtp_pass'").run(req.body.smtp_pass);
+    else db.prepare("INSERT INTO config (key, value) VALUES ('smtp_pass', ?)").run(req.body.smtp_pass);
+  }
+  res.json({ success: true, data: { message: 'SMTP settings saved' } });
+});
+
+router.post('/smtp/test', requireAuth, requireRole('admin'), async (req, res) => {
+  const { sendEmail } = require('../utils/email');
+  const sent = await sendEmail({
+    to: req.user.email,
+    subject: 'Kahalany.Dev — SMTP Test',
+    html: '<div style="font-family:sans-serif;padding:20px"><h2 style="color:#00ff88">SMTP is working!</h2><p>Your email configuration is correct.</p></div>'
+  });
+  if (sent) res.json({ success: true, data: { message: `Test email sent to ${req.user.email}` } });
+  else res.status(400).json({ success: false, error: 'SMTP not configured or send failed. Check server logs.' });
 });
 
 // ===== OAUTH CONFIG (admin only) =====

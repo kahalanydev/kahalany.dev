@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { getDb, generateId, logActivity, slugify, nextTicketNumber } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { sendWelcomeEmail } = require('../utils/email');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -294,6 +295,10 @@ router.post('/clients/:orgId/users', (req, res) => {
 
   logActivity(db, { userId: req.user.id, action: 'client_user_created', entityType: 'user', entityId: String(result.lastInsertRowid),
     details: { email, org_name: org.name }, ip: req.ip });
+
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  sendWelcomeEmail({ email: email.toLowerCase().trim(), name, password, role: 'client', loginUrl: `${proto}://${host}/portal` });
 
   res.json({ success: true, data: { user: { id: result.lastInsertRowid, email, name }, temporary_password: password } });
 });

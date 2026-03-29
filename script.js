@@ -109,4 +109,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // --- IDEA FORM ---
+    const ideaForm = document.getElementById('ideaForm');
+    if (ideaForm) {
+        ideaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('ideaSubmitBtn');
+            const msg = document.getElementById('ideaMsg');
+            btn.textContent = 'Sending...'; btn.disabled = true;
+            try {
+                const res = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('ideaName').value,
+                        email: document.getElementById('ideaEmail').value,
+                        message: document.getElementById('ideaText').value
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to send');
+                msg.innerHTML = '<div class="success-msg">Message sent! We\'ll get back to you within 24 hours.</div>';
+                ideaForm.reset();
+            } catch (err) {
+                msg.innerHTML = '<div class="error-msg">' + err.message + '</div>';
+            }
+            btn.textContent = 'Send It Over'; btn.disabled = false;
+        });
+    }
+
+    // --- THEME TOGGLE ---
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+
+    const toggle = document.getElementById('themeToggle');
+    if (toggle) {
+        toggle.addEventListener('click', () => {
+            const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            if (isLight) {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('theme', 'light');
+            }
+        });
+    }
 });

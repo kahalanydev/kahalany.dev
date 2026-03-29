@@ -4,6 +4,9 @@
   const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
   const app = document.getElementById('app');
 
+  // Load saved theme
+  if (localStorage.getItem('portal_theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
+
   // ===== STATE =====
   const state = {
     token: localStorage.getItem('portal_token'),
@@ -293,6 +296,9 @@
           </ul>
           <div class="sidebar-bottom">
             <div class="sidebar-user">${escapeHtml(state.user?.name || state.user?.email)}</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <button class="theme-toggle-btn" id="themeTogglePortal" style="flex:1;justify-content:center">${document.documentElement.getAttribute('data-theme') === 'light' ? '\u2600 Light' : '\u{1F319} Dark'}</button>
+            </div>
             <button class="btn btn-secondary btn-sm" id="logoutBtn" style="width:100%">Logout</button>
           </div>
         </aside>
@@ -306,6 +312,13 @@
     if (toggle) toggle.addEventListener('click', () => {
       state.sidebarOpen = !state.sidebarOpen;
       $('#sidebar').classList.toggle('open', state.sidebarOpen);
+    });
+    const themeBtn = $('#themeTogglePortal');
+    if (themeBtn) themeBtn.addEventListener('click', () => {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      if (isLight) { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('portal_theme', 'dark'); }
+      else { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('portal_theme', 'light'); }
+      render();
     });
   }
 
