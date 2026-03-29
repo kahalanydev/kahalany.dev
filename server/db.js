@@ -194,6 +194,181 @@ function initSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);');
   db.run('CREATE INDEX IF NOT EXISTS idx_suspicious_created ON suspicious_activity(created_at);');
   db.run('CREATE INDEX IF NOT EXISTS idx_suspicious_ip ON suspicious_activity(ip);');
+
+  // ===== PORTAL TABLES =====
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS organizations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      logo_path TEXT,
+      primary_email TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL REFERENCES organizations(id),
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'planning',
+      progress_percent INTEGER DEFAULT 0,
+      tech_stack TEXT,
+      repo_url TEXT,
+      live_url TEXT,
+      coolify_uuid TEXT,
+      start_date TEXT,
+      target_date TEXT,
+      completed_date TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS project_members (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      role TEXT NOT NULL DEFAULT 'member',
+      added_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(project_id, user_id)
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS milestones (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'upcoming',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      target_date TEXT,
+      completed_date TEXT,
+      completion_notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS tickets (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      ticket_number INTEGER NOT NULL,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      assigned_to INTEGER REFERENCES users(id),
+      type TEXT NOT NULL DEFAULT 'task',
+      priority TEXT NOT NULL DEFAULT 'medium',
+      status TEXT NOT NULL DEFAULT 'open',
+      title TEXT NOT NULL,
+      description TEXT,
+      due_date TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      closed_at TEXT
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS ticket_comments (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL REFERENCES tickets(id),
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL,
+      is_internal INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS ticket_attachments (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL REFERENCES tickets(id),
+      uploaded_by INTEGER NOT NULL REFERENCES users(id),
+      filename TEXT NOT NULL,
+      stored_name TEXT NOT NULL,
+      mimetype TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      uploaded_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id TEXT PRIMARY KEY,
+      project_id TEXT REFERENCES projects(id),
+      user_id INTEGER REFERENCES users(id),
+      action TEXT NOT NULL,
+      entity_type TEXT,
+      entity_id TEXT,
+      details TEXT,
+      ip_address TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS project_plans (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) UNIQUE,
+      content TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      approved_at TEXT,
+      approved_by INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS dev_keys (
+      id TEXT PRIMARY KEY,
+      key_id TEXT NOT NULL UNIQUE,
+      secret TEXT NOT NULL,
+      label TEXT,
+      revoked INTEGER NOT NULL DEFAULT 0,
+      expires_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      last_used_at TEXT
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      token_hash TEXT NOT NULL UNIQUE,
+      device_info TEXT,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Portal indexes
+  db.run('CREATE INDEX IF NOT EXISTS idx_projects_org ON projects(org_id);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(project_id);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_tickets_project ON tickets(project_id);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket ON ticket_comments(ticket_id);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_activity_project ON activity_log(project_id);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);');
+
+  // Extend users table for portal (safe: no-op if columns already exist)
+  const safeAlter = (sql) => { try { db.run(sql); } catch(e) {} };
+  safeAlter('ALTER TABLE users ADD COLUMN org_id TEXT');
+  safeAlter('ALTER TABLE users ADD COLUMN login_attempts INTEGER DEFAULT 0');
+  safeAlter('ALTER TABLE users ADD COLUMN locked_until TEXT');
+  safeAlter('ALTER TABLE users ADD COLUMN last_login_at TEXT');
 }
 
 function getJwtSecret() {
@@ -229,4 +404,25 @@ function seedAdmin() {
   console.log('========================================\n');
 }
 
-module.exports = { initDb, getDb, getJwtSecret, seedAdmin };
+function generateId() {
+  return crypto.randomUUID();
+}
+
+function logActivity(db, { projectId, userId, action, entityType, entityId, details, ip }) {
+  db.prepare(`
+    INSERT INTO activity_log (id, project_id, user_id, action, entity_type, entity_id, details, ip_address)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(generateId(), projectId || null, userId || null, action, entityType || null, entityId || null,
+    details ? JSON.stringify(details) : null, ip || null);
+}
+
+function slugify(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 80);
+}
+
+function nextTicketNumber(db, projectId) {
+  const row = db.prepare('SELECT COALESCE(MAX(ticket_number), 0) + 1 as next FROM tickets WHERE project_id = ?').get(projectId);
+  return row.next;
+}
+
+module.exports = { initDb, getDb, getJwtSecret, seedAdmin, generateId, logActivity, slugify, nextTicketNumber };

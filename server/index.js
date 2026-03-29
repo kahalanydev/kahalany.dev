@@ -7,6 +7,7 @@ const { initDb, seedAdmin } = require('./db');
 const authRoutes = require('./routes/auth');
 const trackRoutes = require('./routes/track');
 const adminRoutes = require('./routes/admin');
+const portalRoutes = require('./routes/portal');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -38,9 +39,16 @@ app.use('/.dockerignore', (req, res) => res.status(404).end());
 app.use('/api/auth', authRoutes);
 app.use('/api/track', trackRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/portal', portalRoutes);
 
 // Serve admin panel
 app.use('/admin', express.static(path.join(__dirname, '..', 'admin'), {
+  extensions: ['html'],
+  index: 'index.html'
+}));
+
+// Serve client portal
+app.use('/portal', express.static(path.join(__dirname, '..', 'portal'), {
   extensions: ['html'],
   index: 'index.html'
 }));
@@ -79,6 +87,7 @@ async function start() {
     console.log(`Server running on port ${PORT}`);
     console.log(`Main site: http://localhost:${PORT}`);
     console.log(`Admin panel: http://localhost:${PORT}/admin`);
+    console.log(`Client portal: http://localhost:${PORT}/portal`);
   });
 }
 

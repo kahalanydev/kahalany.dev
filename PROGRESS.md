@@ -182,6 +182,122 @@ Added a full admin panel with security monitoring, visitor analytics, and engage
 
 ---
 
+## 2026-03-29 — Client Portal System (Phase 1: Core Infrastructure)
+
+### Context
+Built a full client portal system allowing clients to view project progress, submit tickets, communicate through comments, and approve project plans. Phase 1 covers all server-side infrastructure and both admin/portal frontends.
+
+### Architecture & Security
+- **Role-based access control**: `admin`, `staff`, `client` roles with middleware guards
+- **Org-scoped data isolation**: Clients only see their own organization's projects (enforced server-side, returns 404 not 403 to prevent enumeration)
+- **Internal comments**: Admin/staff can post comments hidden from clients (`is_internal` flag)
+- **UUID-based IDs**: All client-facing entities use UUIDs to prevent enumeration attacks
+- **Rate limiting**: In-memory per-IP rate limiting (60 req/min for portal, configurable per endpoint group)
+- **HMAC-signed dev API**: Prepared for Claude Code integration (replay-protected, time-bounded)
+- **Immutable audit trail**: All state-changing actions logged to `activity_log` table
+
+### Database Schema (11 new tables)
+- `organizations` — client companies
+- `projects` — with lifecycle status (planning → proposed → approved → in_progress → review → completed → maintenance → archived)
+- `project_members` — user-project assignments with roles
+- `milestones` — project phases with status and sort order
+- `tickets` — bug reports, feature requests, tasks, questions
+- `ticket_comments` — with `is_internal` flag for admin-only notes
+- `ticket_attachments` — prepared for Phase 4 file uploads
+- `activity_log` — immutable audit trail
+- `project_plans` — versioned project plans for client approval
+- `dev_keys` — HMAC keys for Claude Code dev API
+- `refresh_tokens` — prepared for token refresh flow
+
+### Server Changes
+
+#### `server/db.js` (modified)
+- Added all 11 tables with indexes
+- Added ALTER TABLE migrations for users table (org_id, login_attempts, locked_until, last_login_at)
+- Added helpers: `generateId()`, `logActivity()`, `slugify()`, `nextTicketNumber()`
+
+#### `server/middleware/auth.js` (rewritten)
+- Extended `requireAuth` to include org_id in user query
+- Added `requireRole(...roles)` middleware factory
+- Added `enforceOrgScope` — verifies project belongs to user's org
+- Added `requireDevAuth` — HMAC-SHA256 signature verification (60s replay window)
+- Added `rateLimit(maxRequests, windowMs)` with in-memory Map and periodic cleanup
+
+#### `server/routes/admin.js` (major extension)
+- Organization CRUD: GET/POST/PATCH `/api/admin/clients`, POST/GET client users
+- Project CRUD: GET/POST/PATCH `/api/admin/projects`, GET project detail
+- Propose endpoint: POST `/api/admin/projects/:projectId/propose`
+- Milestone CRUD with auto-progress recalculation
+- Plan management: POST `/api/admin/projects/:projectId/plan`
+- Ticket management: GET list, GET detail, PATCH status/priority/assignment
+- Comments with internal flag: POST `/api/admin/tickets/:ticketId/comments`
+- Dev key management: GET/POST/DELETE `/api/admin/dev-keys`
+
+#### `server/routes/portal.js` (new)
+- Client-facing API with `requireAuth` + `rateLimit(60, 60000)`
+- Dashboard: projects + recent activity for client's org
+- Project detail: milestones, progress, activity (org-scoped)
+- Plan viewing + approval (sets status to approved, starts first milestone)
+- Ticket list with filters, creation (clients can't set urgent priority)
+- Ticket detail with PUBLIC comments only (is_internal = 0)
+- Client comment posting (always public)
+- Activity feed (filters out internal actions)
+
+#### `server/index.js` (modified)
+- Added portal routes (`/api/portal`)
+- Added portal static file serving (`/portal`)
+
+### Portal Frontend (`portal/`)
+- `index.html` — SPA shell matching admin pattern
+- `styles.css` (~400 lines) — same design system as admin (dark theme), portal-specific components (project cards, progress bars, milestone timeline, ticket detail, comments, activity feed)
+- `app.js` (~500 lines) — full SPA with hash routing:
+  - Login (validates role === 'client', redirects admins to /admin)
+  - Dashboard with project cards + recent activity
+  - Project view with milestone timeline + progress bar
+  - Plan view with approve button
+  - Ticket list with filter tabs + creation form
+  - Ticket detail with comment thread + reply
+  - Activity feed with pagination
+
+### Admin Frontend (`admin/app.js` extended)
+- **Projects page**: Project list with create form, progress bars, org select, status management
+- **Project detail**: Status dropdown, milestone management (add/edit/delete), plan editor with "Send to Client" button, tickets table, activity log
+- **Ticket detail**: Status/priority selects, comment thread with internal note styling (yellow border), post public vs internal comments
+- **Clients page**: Organization list with user management, create org form, add client user with temp password display
+
+### Testing Results
+- Full end-to-end test: admin login → create org → create client user → create project → add milestones → create plan → propose → client login → view dashboard → view project → approve plan → create ticket → add comments → verify internal comment isolation
+- **Critical security verified**: Admin sees 2 comments (1 public + 1 internal), client sees only 1 (public)
+- All API endpoints return proper error codes and role-based access works correctly
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `portal/index.html` | Portal SPA shell |
+| `portal/styles.css` | Portal dark theme styles (~400 lines) |
+| `portal/app.js` | Portal SPA application (~500 lines) |
+| `server/routes/portal.js` | Portal API routes (~255 lines) |
+| `CLIENT-PORTAL-PLAN.md` | Full architecture plan (~700 lines) |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/db.js` | 11 new tables, indexes, helper functions |
+| `server/middleware/auth.js` | Complete rewrite with RBAC, org scope, rate limiting, HMAC auth |
+| `server/routes/admin.js` | ~400 lines added for project/org/ticket management |
+| `server/index.js` | Portal routes + static serving |
+| `admin/app.js` | ~400 lines added for projects/clients/ticket management |
+| `APP-MAP.md` | Updated with portal architecture |
+| `PROGRESS.md` | This entry |
+
+### Remaining Phases
+- **Phase 2**: Dev API & Claude Code integration (HMAC endpoints, portal sync service, project scaffolding)
+- **Phase 3**: Project Plans & Approval flow polish (plan versioning, markdown editor)
+- **Phase 4**: File Uploads & Polish (Multer, email notifications, mobile)
+- **Phase 5**: PCG Pilot (real client onboarding)
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [ ] Add more contact methods (phone, WhatsApp, Calendly)

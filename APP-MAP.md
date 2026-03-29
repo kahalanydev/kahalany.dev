@@ -28,20 +28,25 @@ Kahalany.Dev Site/
 ├── tracker.js              # Lightweight analytics tracker (scroll, clicks, sections)
 ├── favicon.svg             # Branded "K" favicon (SVG)
 ├── server/
-│   ├── index.js            # Express entry point (port 8080)
-│   ├── db.js               # SQLite init, schema, wrapper (sql.js), admin seeding
+│   ├── index.js            # Express entry point (port 8080), routes + static serving
+│   ├── db.js               # SQLite init, schema (17 tables), wrapper, admin seeding, helpers
 │   ├── middleware/
-│   │   └── auth.js         # JWT auth middleware (requireAuth)
+│   │   └── auth.js         # Auth: requireAuth, requireRole, enforceOrgScope, requireDevAuth, rateLimit
 │   ├── routes/
 │   │   ├── auth.js         # POST /api/auth/login, /change-password, GET/POST/DELETE /api/auth/users
 │   │   ├── track.js        # POST /api/track/visit, /api/track/event
-│   │   └── admin.js        # GET /api/admin/dashboard, /security, /analytics
+│   │   ├── admin.js        # Admin API: dashboard, security, analytics, orgs, projects, milestones, tickets, plans, dev-keys
+│   │   └── portal.js       # Portal API: dashboard, projects, tickets, comments, activity, plan approval
 │   └── utils/
 │       └── detection.js    # Bot detection, rate tracking, suspicious activity logging
 ├── admin/
 │   ├── index.html          # Admin panel shell (loads Chart.js + app.js)
 │   ├── styles.css          # Admin dark theme styles
-│   └── app.js              # Admin SPA (login, dashboard, security, analytics, settings)
+│   └── app.js              # Admin SPA (dashboard, security, analytics, settings, projects, clients, tickets)
+├── portal/
+│   ├── index.html          # Client portal shell
+│   ├── styles.css          # Portal dark theme styles (shared design system with admin)
+│   └── app.js              # Portal SPA (login, dashboard, projects, tickets, plans, activity)
 ├── data/
 │   └── analytics.db        # SQLite database (gitignored, persisted via Docker volume)
 ├── package.json            # Node.js deps: express, sql.js, bcryptjs, jsonwebtoken, helmet, etc.
@@ -49,6 +54,7 @@ Kahalany.Dev Site/
 ├── .dockerignore           # Excludes node_modules, data, .git, *.md
 ├── .gitignore              # Excludes node_modules/, data/
 ├── nginx.conf              # Legacy reference (no longer used — Express serves everything)
+├── CLIENT-PORTAL-PLAN.md   # Full client portal architecture & implementation plan
 ├── APP-MAP.md              # This file
 ├── PROGRESS.md             # Development log
 └── CLAUDE.md               # Claude Code instructions
@@ -61,25 +67,46 @@ Kahalany.Dev Site/
 Client → Traefik (SSL) → Express (:8080)
   ├── /                    → static index.html + assets
   ├── /admin               → admin SPA (admin/index.html)
+  ├── /portal              → client portal SPA (portal/index.html)
   ├── /api/auth/*          → auth routes (JWT login, user management)
   ├── /api/track/*         → tracking endpoints (visits, events)
-  ├── /api/admin/*         → admin data API (requires JWT)
+  ├── /api/admin/*         → admin data API (requires JWT + admin/staff role)
+  ├── /api/portal/*        → portal data API (requires JWT + org-scoped access)
   └── 404                  → suspicious activity logger
 ```
 
-### Database Schema (SQLite)
+### Database Schema (SQLite — 17 tables)
+
+**Core (existing)**:
 - **config** — key/value store (JWT secret)
-- **users** — admin accounts (email, bcrypt hash, must_change_password flag)
+- **users** — all accounts: admin, staff, client (email, bcrypt hash, role, org_id)
 - **visits** — visitor sessions (IP, UA, geo, device, referrer, bot flag)
 - **events** — tracking events (pageview, click, section_view, heartbeat, leave)
 - **suspicious_activity** — flagged events (rate spikes, scanner paths, bot UAs)
 - **geo_cache** — IP geolocation cache (from ip-api.com)
+
+**Client Portal (new)**:
+- **organizations** — client companies
+- **projects** — with lifecycle status machine (planning → proposed → approved → in_progress → review → completed → maintenance → archived)
+- **project_members** — user-project assignments with roles
+- **milestones** — project phases with status and sort order
+- **tickets** — bug reports, feature requests, tasks, modifications, questions
+- **ticket_comments** — with `is_internal` flag for admin-only notes
+- **ticket_attachments** — prepared for file uploads
+- **activity_log** — immutable audit trail for all state changes
+- **project_plans** — versioned plans for client approval
+- **dev_keys** — HMAC keys for Claude Code dev API
+- **refresh_tokens** — prepared for token refresh flow
 
 ### Auth System
 - JWT tokens (24h expiry), secret auto-generated and stored in DB
 - First admin seeded on startup with random password (printed to console logs)
 - `must_change_password` flag forces password change on first login
 - Admins can add/remove other admins via Settings page
+- **Role-based access**: `admin` (full access), `staff` (project management), `client` (portal only)
+- **Org-scoped isolation**: Clients only see their own organization's data (returns 404 not 403)
+- **Rate limiting**: In-memory per-IP limiting (60 req/min portal, configurable per endpoint)
+- **HMAC dev API**: Prepared for Claude Code integration (SHA-256 signatures, 60s replay window)
 
 ### Tracker (tracker.js)
 - Respects Do Not Track (DNT) header
@@ -162,6 +189,55 @@ Client → Traefik (SSL) → Express (:8080)
 - Change password form
 - Admin user management (list, add, remove)
 - New admin gets random temp password (must change on first login)
+
+## Client Portal Pages
+
+### Login
+- Email/password form, JWT stored in localStorage as `portal_token`
+- Validates role === 'client', redirects admin/staff to /admin
+
+### Dashboard
+- Project cards with progress bars and status badges
+- Recent activity feed across all org projects
+- Quick links to project details
+
+### Project View
+- Milestone timeline with status indicators (upcoming, in_progress, completed)
+- Progress bar (auto-calculated from milestone completion)
+- Open ticket count, recent activity
+
+### Plan View
+- Project plan content display
+- Approve button (only for `proposed` status projects)
+- Approval triggers project start + first milestone activation
+
+### Tickets
+- Filter tabs: All, Open, In Progress, Closed
+- Type and priority filters
+- Create new ticket form (types: task, bug, feature_request, modification, question)
+- Ticket detail with comment thread and reply form
+- Internal comments hidden from clients
+
+### Activity Feed
+- Paginated activity log for project
+- Filters out internal actions automatically
+
+## Admin Panel Extensions (Client Portal)
+
+### Projects Page
+- Project list with progress bars, status badges, org assignment
+- Create project form with org selection
+- Project detail: status management, milestone CRUD, plan editor, ticket list, activity log
+
+### Clients Page
+- Organization list with user counts
+- Create organization form
+- Add client users with temporary password generation
+
+### Ticket Management
+- Status/priority/assignment controls
+- Comment thread with internal note option (yellow-bordered)
+- Post as public or internal comment
 
 ## Deployment
 - **Docker**: `node:20-alpine` runs Express on port 8080

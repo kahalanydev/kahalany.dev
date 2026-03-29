@@ -241,6 +241,8 @@
   function renderLayout(content) {
     const navItems = [
       { id: 'dashboard', icon: '\u25A3', label: 'Dashboard' },
+      { id: 'projects', icon: '\u{1F4CB}', label: 'Projects' },
+      { id: 'clients', icon: '\u{1F465}', label: 'Clients' },
       { id: 'security', icon: '\u26A0', label: 'Security' },
       { id: 'analytics', icon: '\u25CE', label: 'Analytics' },
       { id: 'settings', icon: '\u2699', label: 'Settings' },
@@ -825,11 +827,539 @@
     }
   }
 
+  // ===== RENDER: PROJECTS =====
+  async function renderProjects() {
+    renderLayout(`
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:start">
+        <div><h1>Projects</h1><p>Manage client projects</p></div>
+        <button class="btn btn-primary" id="newProjectBtn" style="width:auto">New Project</button>
+      </div>
+      <div class="loading"><div class="spinner"></div> Loading...</div>
+    `);
+
+    try {
+      const res = await api('/admin/projects');
+      const projects = res.data.projects;
+
+      const statusColors = { planning: 'badge-gray', proposed: 'badge-yellow', approved: 'badge-blue', in_progress: 'badge-blue', review: 'badge-yellow', completed: 'badge-green', maintenance: 'badge-green', archived: 'badge-gray' };
+
+      $('#mainContent').innerHTML = `
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:start">
+          <div><h1>Projects</h1><p>Manage client projects</p></div>
+          <button class="btn btn-primary" id="newProjectBtn" style="width:auto">New Project</button>
+        </div>
+
+        <div id="newProjectForm" style="display:none;margin-bottom:24px" class="card">
+          <div class="card-header"><span class="card-title">Create Project</span></div>
+          <div id="newProjectMsg"></div>
+          <form id="createProjectForm">
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:200px">
+                <label>Organization</label>
+                <select id="projOrg" required style="width:100%;padding:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+                  <option value="">Select org...</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex:2;min-width:200px">
+                <label>Project Name</label>
+                <input type="text" id="projName" required placeholder="e.g. PCG Website Redesign" style="width:100%;padding:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="projDesc" placeholder="Brief description" style="width:100%;padding:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:auto">Create</button>
+          </form>
+        </div>
+
+        <div class="card" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Project</th><th>Client</th><th>Status</th><th>Progress</th><th>Tickets</th><th>Last Activity</th></tr></thead>
+              <tbody>
+                ${projects.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:32px">No projects yet</td></tr>' :
+                  projects.map(p => `<tr data-project-id="${p.id}" style="cursor:pointer">
+                    <td style="color:var(--text);font-weight:500">${escapeHtml(p.name)}</td>
+                    <td>${escapeHtml(p.org_name)}</td>
+                    <td><span class="badge ${statusColors[p.status] || 'badge-gray'}">${p.status.replace(/_/g, ' ')}</span></td>
+                    <td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:var(--surface-3);border-radius:3px;min-width:60px"><div style="height:100%;background:var(--accent);border-radius:3px;width:${p.progress_percent}%"></div></div><span style="font-size:11px">${p.progress_percent}%</span></div></td>
+                    <td>${p.open_tickets > 0 ? `<span class="badge badge-yellow">${p.open_tickets} open</span>` : '<span style="color:var(--text-dim)">0</span>'}</td>
+                    <td>${p.last_activity ? timeAgo(p.last_activity) : '-'}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      // New project toggle
+      $('#newProjectBtn').addEventListener('click', async () => {
+        const form = $('#newProjectForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        if (form.style.display === 'block') {
+          // Load orgs into select
+          const orgsRes = await api('/admin/clients');
+          const select = $('#projOrg');
+          select.innerHTML = '<option value="">Select org...</option>' +
+            orgsRes.data.organizations.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+        }
+      });
+
+      // Create project handler
+      $('#createProjectForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          await api('/admin/projects', {
+            method: 'POST',
+            body: JSON.stringify({ org_id: $('#projOrg').value, name: $('#projName').value, description: $('#projDesc').value })
+          });
+          renderProjects();
+        } catch (err) {
+          $('#newProjectMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      });
+
+      // Click to view project
+      $$('tr[data-project-id]').forEach(row => row.addEventListener('click', () => {
+        state.page = 'projectDetail';
+        state.projectDetailId = row.dataset.projectId;
+        window.location.hash = `#/projects/${row.dataset.projectId}`;
+        render();
+      }));
+    } catch (err) {
+      $('#mainContent').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ===== RENDER: PROJECT DETAIL (admin) =====
+  async function renderProjectDetail(projectId) {
+    renderLayout(`
+      <div class="page-header"><h1>Project</h1></div>
+      <div class="loading"><div class="spinner"></div> Loading...</div>
+    `);
+
+    try {
+      const res = await api(`/admin/projects/${projectId}`);
+      const { project, milestones, plan, members, recentActivity } = res.data;
+
+      const statusOptions = ['planning', 'proposed', 'approved', 'in_progress', 'review', 'completed', 'maintenance', 'archived'];
+      const statusColors = { planning: 'badge-gray', proposed: 'badge-yellow', approved: 'badge-blue', in_progress: 'badge-blue', review: 'badge-yellow', completed: 'badge-green', maintenance: 'badge-green', archived: 'badge-gray' };
+      const msStatusColors = { upcoming: 'badge-gray', in_progress: 'badge-blue', completed: 'badge-green', skipped: 'badge-gray' };
+
+      $('#mainContent').innerHTML = `
+        <div style="margin-bottom:16px">
+          <a href="#/projects" style="color:var(--text-secondary);text-decoration:none;font-size:13px">\u2190 All Projects</a>
+        </div>
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <h1>${escapeHtml(project.name)}</h1>
+            <p>${escapeHtml(project.org_name)} \u2022 ${escapeHtml(project.description || '')}</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="statusSelect" style="padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+              ${statusOptions.map(s => `<option value="${s}" ${s === project.status ? 'selected' : ''}>${s.replace(/_/g, ' ')}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div id="statusMsg"></div>
+
+        <div style="display:flex;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:24px">
+          <div style="flex:1;text-align:center">
+            <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px">Progress</div>
+            <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:var(--accent)">${project.progress_percent}%</div>
+          </div>
+          <div style="flex:1;text-align:center">
+            <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px">Milestones</div>
+            <div style="font-size:24px;font-weight:700;font-family:var(--mono)">${milestones.filter(m=>m.status==='completed').length}/${milestones.length}</div>
+          </div>
+          <div style="flex:1;text-align:center">
+            <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px">Target</div>
+            <div style="font-size:14px;font-weight:500">${project.target_date ? new Date(project.target_date+'Z').toLocaleDateString() : '-'}</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Milestones -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Milestones</span>
+              <button class="btn btn-secondary btn-sm" id="addMsBtn">+ Add</button>
+            </div>
+            <div id="addMsForm" style="display:none;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+              <div style="display:flex;gap:8px">
+                <input type="text" id="msTitle" placeholder="Milestone title" style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+                <button class="btn btn-primary btn-sm" id="saveMsBtn">Save</button>
+              </div>
+            </div>
+            ${milestones.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No milestones yet.</p>' :
+              milestones.map(m => `
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface-3)" data-ms-id="${m.id}">
+                  <select class="ms-status-select" data-ms-id="${m.id}" style="padding:4px 8px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;min-width:90px">
+                    ${['upcoming','in_progress','completed','skipped'].map(s => `<option value="${s}" ${s===m.status?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}
+                  </select>
+                  <span style="flex:1;font-size:14px">${escapeHtml(m.title)}</span>
+                  <button class="btn btn-danger btn-sm ms-delete" data-ms-id="${m.id}" style="padding:2px 8px;font-size:10px">\u2715</button>
+                </div>
+              `).join('')}
+          </div>
+
+          <!-- Plan -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Project Plan</span>
+              <div>
+                ${plan ? `<span style="font-size:11px;color:var(--text-dim);margin-right:8px">v${plan.version}</span>` : ''}
+                <button class="btn btn-secondary btn-sm" id="editPlanBtn">${plan ? 'Edit' : 'Create'} Plan</button>
+              </div>
+            </div>
+            <div id="planEditor" style="display:none;margin-bottom:16px">
+              <textarea id="planContent" style="width:100%;min-height:200px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;resize:vertical">${plan ? escapeHtml(plan.content) : ''}</textarea>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-primary btn-sm" id="savePlanBtn">Save Plan</button>
+                ${project.status === 'planning' && plan ? `<button class="btn btn-secondary btn-sm" id="proposePlanBtn">Send to Client</button>` : ''}
+              </div>
+              <div id="planMsg" style="margin-top:8px"></div>
+            </div>
+            ${plan ? `<div style="max-height:200px;overflow-y:auto;font-size:13px;color:var(--text-secondary);white-space:pre-wrap;line-height:1.5">${escapeHtml(plan.content).substring(0, 500)}${plan.content.length > 500 ? '...' : ''}</div>` :
+              '<p style="color:var(--text-dim);font-size:13px">No plan created yet.</p>'}
+          </div>
+        </div>
+
+        <!-- Tickets -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Tickets</span></div>
+          <div id="ticketsSection"><div class="loading"><div class="spinner"></div> Loading tickets...</div></div>
+        </div>
+
+        <!-- Activity -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Activity</span></div>
+          ${recentActivity.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No activity yet.</p>' : `
+            <div style="max-height:300px;overflow-y:auto">
+              ${recentActivity.map(a => {
+                const d = a.details ? JSON.parse(a.details) : {};
+                return `<div style="padding:8px 0;border-bottom:1px solid var(--surface-3);font-size:13px;color:var(--text-secondary)">
+                  <strong>${escapeHtml(a.user_name || a.user_email || 'System')}</strong> — ${a.action.replace(/_/g, ' ')}
+                  <span style="float:right;color:var(--text-dim);font-size:11px">${timeAgo(a.created_at)}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      `;
+
+      // Status change handler
+      $('#statusSelect').addEventListener('change', async (e) => {
+        try {
+          await api(`/admin/projects/${projectId}`, { method: 'PATCH', body: JSON.stringify({ status: e.target.value }) });
+          $('#statusMsg').innerHTML = `<div class="alert alert-success" style="margin-bottom:16px">Status updated to ${e.target.value}</div>`;
+          setTimeout(() => { const el = $('#statusMsg'); if(el) el.innerHTML=''; }, 2000);
+        } catch (err) { $('#statusMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
+      });
+
+      // Add milestone
+      $('#addMsBtn').addEventListener('click', () => {
+        const form = $('#addMsForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      });
+      $('#saveMsBtn').addEventListener('click', async () => {
+        const title = $('#msTitle').value.trim();
+        if (!title) return;
+        try {
+          await api(`/admin/projects/${projectId}/milestones`, { method: 'POST', body: JSON.stringify({ title }) });
+          renderProjectDetail(projectId);
+        } catch (err) { alert(err.message); }
+      });
+
+      // Milestone status changes
+      $$('.ms-status-select').forEach(sel => sel.addEventListener('change', async (e) => {
+        try {
+          await api(`/admin/milestones/${e.target.dataset.msId}`, { method: 'PATCH', body: JSON.stringify({ status: e.target.value }) });
+          renderProjectDetail(projectId);
+        } catch (err) { alert(err.message); }
+      }));
+
+      // Milestone delete
+      $$('.ms-delete').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Delete this milestone?')) return;
+        try {
+          await api(`/admin/milestones/${btn.dataset.msId}`, { method: 'DELETE' });
+          renderProjectDetail(projectId);
+        } catch (err) { alert(err.message); }
+      }));
+
+      // Plan editor
+      $('#editPlanBtn').addEventListener('click', () => {
+        const editor = $('#planEditor');
+        editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+      });
+      $('#savePlanBtn').addEventListener('click', async () => {
+        try {
+          await api(`/admin/projects/${projectId}/plan`, { method: 'POST', body: JSON.stringify({ content: $('#planContent').value }) });
+          renderProjectDetail(projectId);
+        } catch (err) {
+          const msg = $('#planMsg');
+          if (msg) msg.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      });
+      const proposeBtn = $('#proposePlanBtn');
+      if (proposeBtn) {
+        proposeBtn.addEventListener('click', async () => {
+          if (!confirm('This will send the plan to the client for approval. Continue?')) return;
+          try {
+            // Save plan first, then propose
+            await api(`/admin/projects/${projectId}/plan`, { method: 'POST', body: JSON.stringify({ content: $('#planContent').value }) });
+            await api(`/admin/projects/${projectId}/propose`, { method: 'POST' });
+            renderProjectDetail(projectId);
+          } catch (err) { alert(err.message); }
+        });
+      }
+
+      // Load tickets
+      try {
+        const ticketsRes = await api(`/admin/projects/${projectId}/tickets`);
+        const tickets = ticketsRes.data.tickets;
+        const tsEl = $('#ticketsSection');
+        if (!tsEl) return;
+        tsEl.innerHTML = tickets.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No tickets yet.</p>' : `
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Updated</th></tr></thead>
+            <tbody>${tickets.map(t => `<tr data-ticket-href="#/tickets/${t.id}" style="cursor:pointer">
+              <td style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
+              <td style="color:var(--text)">${escapeHtml(t.title)}</td>
+              <td><span class="badge badge-gray">${t.type.replace(/_/g,' ')}</span></td>
+              <td><span class="badge ${t.priority==='high'||t.priority==='urgent'?'badge-red':t.priority==='medium'?'badge-yellow':'badge-gray'}">${t.priority}</span></td>
+              <td><span class="badge ${t.status==='open'?'badge-blue':t.status==='in_progress'?'badge-yellow':t.status==='completed'?'badge-green':'badge-gray'}">${t.status.replace(/_/g,' ')}</span></td>
+              <td>${escapeHtml(t.assigned_to_name || '-')}</td>
+              <td>${timeAgo(t.updated_at)}</td>
+            </tr>`).join('')}</tbody>
+          </table></div>
+        `;
+        $$('[data-ticket-href]').forEach(r => r.addEventListener('click', () => {
+          window.location.hash = r.dataset.ticketHref;
+        }));
+      } catch (e) {
+        const tsEl = $('#ticketsSection');
+        if (tsEl) tsEl.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
+      }
+    } catch (err) {
+      $('#mainContent').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ===== RENDER: TICKET DETAIL (admin) =====
+  async function renderAdminTicketDetail(ticketId) {
+    renderLayout(`<div class="loading"><div class="spinner"></div> Loading ticket...</div>`);
+
+    try {
+      const res = await api(`/admin/tickets/${ticketId}`);
+      const { ticket, comments } = res.data;
+
+      const statusOpts = ['open', 'in_progress', 'review', 'completed', 'closed'];
+      const priorityOpts = ['low', 'medium', 'high', 'urgent'];
+
+      $('#mainContent').innerHTML = `
+        <div style="margin-bottom:16px">
+          <a href="#/projects/${ticket.project_id || ''}" style="color:var(--text-secondary);text-decoration:none;font-size:13px">\u2190 Back to Project</a>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:24px">
+          <div>
+            <h1 style="font-size:22px;margin-bottom:8px">#${ticket.ticket_number} — ${escapeHtml(ticket.title)}</h1>
+            <div style="font-size:13px;color:var(--text-secondary)">
+              ${escapeHtml(ticket.project_name || '')} \u2022 Created by ${escapeHtml(ticket.created_by_name || ticket.created_by_email)} \u2022 ${timeAgo(ticket.created_at)}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select id="ticketStatus" style="padding:6px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:12px">
+              ${statusOpts.map(s => `<option value="${s}" ${s===ticket.status?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}
+            </select>
+            <select id="ticketPriority" style="padding:6px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:12px">
+              ${priorityOpts.map(p => `<option value="${p}" ${p===ticket.priority?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div id="ticketUpdateMsg"></div>
+
+        ${ticket.description ? `<div style="padding:16px;background:var(--surface-2);border-radius:var(--radius);font-size:14px;line-height:1.6;color:var(--text-secondary);margin-bottom:24px;white-space:pre-wrap">${escapeHtml(ticket.description)}</div>` : ''}
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">Comments (${comments.length})</span></div>
+          ${comments.map(c => `
+            <div style="padding:12px;background:${c.is_internal?'rgba(245,158,11,0.05)':'var(--surface-2)'};border-radius:var(--radius);margin-bottom:8px;border-left:3px solid ${c.is_internal?'var(--warning)':c.user_role==='client'?'var(--success)':'var(--accent)'}">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px">
+                <span style="font-weight:600;color:var(--text)">${escapeHtml(c.user_name || c.user_email)} <span class="badge ${c.user_role==='client'?'badge-green':c.is_internal?'badge-yellow':'badge-blue'}">${c.is_internal?'internal':c.user_role}</span></span>
+                <span style="color:var(--text-dim)">${timeAgo(c.created_at)}</span>
+              </div>
+              <div style="font-size:14px;color:var(--text-secondary);white-space:pre-wrap">${escapeHtml(c.body)}</div>
+            </div>
+          `).join('')}
+
+          <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+            <div style="display:flex;gap:12px;margin-bottom:8px">
+              <textarea id="newComment" placeholder="Add a comment..." style="flex:1;padding:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;min-height:60px;resize:vertical"></textarea>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" id="postPublicBtn">Post (visible to client)</button>
+              <button class="btn btn-secondary btn-sm" id="postInternalBtn" style="border-color:var(--warning);color:var(--warning)">Post Internal Note</button>
+            </div>
+            <div id="commentMsg" style="margin-top:8px"></div>
+          </div>
+        </div>
+      `;
+
+      // Status/priority change
+      const updateTicket = async (field, value) => {
+        try {
+          await api(`/admin/tickets/${ticketId}`, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
+          $('#ticketUpdateMsg').innerHTML = `<div class="alert alert-success" style="margin-bottom:12px">${field} updated</div>`;
+          setTimeout(() => { const el=$('#ticketUpdateMsg'); if(el) el.innerHTML=''; }, 2000);
+        } catch (err) { $('#ticketUpdateMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
+      };
+      $('#ticketStatus').addEventListener('change', (e) => updateTicket('status', e.target.value));
+      $('#ticketPriority').addEventListener('change', (e) => updateTicket('priority', e.target.value));
+
+      // Post comment
+      const postComment = async (isInternal) => {
+        const body = $('#newComment').value.trim();
+        if (!body) return;
+        try {
+          await api(`/admin/tickets/${ticketId}/comments`, { method: 'POST', body: JSON.stringify({ body, is_internal: isInternal }) });
+          renderAdminTicketDetail(ticketId);
+        } catch (err) { $('#commentMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
+      };
+      $('#postPublicBtn').addEventListener('click', () => postComment(false));
+      $('#postInternalBtn').addEventListener('click', () => postComment(true));
+    } catch (err) {
+      $('#mainContent').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ===== RENDER: CLIENTS =====
+  async function renderClients() {
+    renderLayout(`
+      <div class="page-header"><h1>Clients</h1><p>Manage client organizations</p></div>
+      <div class="loading"><div class="spinner"></div> Loading...</div>
+    `);
+
+    try {
+      const res = await api('/admin/clients');
+      const orgs = res.data.organizations;
+
+      $('#mainContent').innerHTML = `
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:start">
+          <div><h1>Clients</h1><p>Manage client organizations</p></div>
+          <button class="btn btn-primary" id="newOrgBtn" style="width:auto">New Client</button>
+        </div>
+
+        <div id="newOrgForm" style="display:none;margin-bottom:24px" class="card">
+          <div class="card-header"><span class="card-title">Create Organization</span></div>
+          <div id="newOrgMsg"></div>
+          <form id="createOrgForm" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="text" id="orgName" placeholder="Company name" required style="flex:1;min-width:200px;padding:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+            <input type="email" id="orgEmail" placeholder="Primary email" required style="flex:1;min-width:200px;padding:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+            <button type="submit" class="btn btn-primary" style="width:auto">Create</button>
+          </form>
+        </div>
+
+        ${orgs.length === 0 ? '<div class="empty-state"><p>No clients yet. Create one to get started!</p></div>' :
+          orgs.map(o => `
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header">
+                <span class="card-title">${escapeHtml(o.name)}</span>
+                <span style="font-size:12px;color:var(--text-dim)">${escapeHtml(o.primary_email)}</span>
+              </div>
+              <div style="display:flex;gap:24px;font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+                <span>${o.project_count} project${o.project_count!==1?'s':''}</span>
+                <span>${o.user_count} portal user${o.user_count!==1?'s':''}</span>
+                <span>Created ${timeAgo(o.created_at)}</span>
+              </div>
+              <div style="border-top:1px solid var(--border);padding-top:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                  <span style="font-size:13px;font-weight:600">Portal Users</span>
+                  <button class="btn btn-secondary btn-sm add-user-btn" data-org-id="${o.id}">+ Add User</button>
+                </div>
+                <div id="addUserForm-${o.id}" style="display:none;margin-bottom:12px">
+                  <div style="display:flex;gap:8px">
+                    <input type="email" placeholder="Email" class="new-client-email" style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+                    <input type="text" placeholder="Name" class="new-client-name" style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+                    <button class="btn btn-primary btn-sm save-client-btn" data-org-id="${o.id}">Create</button>
+                  </div>
+                  <div class="new-client-result" style="margin-top:8px"></div>
+                </div>
+                <div id="usersList-${o.id}" style="font-size:13px;color:var(--text-dim)">Loading...</div>
+              </div>
+            </div>
+          `).join('')}
+      `;
+
+      // New org toggle + handler
+      $('#newOrgBtn').addEventListener('click', () => {
+        const form = $('#newOrgForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      });
+      $('#createOrgForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          await api('/admin/clients', { method: 'POST', body: JSON.stringify({ name: $('#orgName').value, primary_email: $('#orgEmail').value }) });
+          renderClients();
+        } catch (err) { $('#newOrgMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
+      });
+
+      // Load users for each org + add user handlers
+      for (const o of orgs) {
+        try {
+          const usersRes = await api(`/admin/clients/${o.id}/users`);
+          const users = usersRes.data.users;
+          const el = $(`#usersList-${o.id}`);
+          if (!el) continue;
+          el.innerHTML = users.length === 0 ? 'No portal users yet.' :
+            users.map(u => `<div style="padding:4px 0">${escapeHtml(u.email)} ${u.name ? '('+escapeHtml(u.name)+')' : ''} ${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</div>`).join('');
+        } catch(e) {}
+      }
+
+      // Add user toggles
+      $$('.add-user-btn').forEach(btn => btn.addEventListener('click', () => {
+        const form = $(`#addUserForm-${btn.dataset.orgId}`);
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      }));
+
+      // Save client user
+      $$('.save-client-btn').forEach(btn => btn.addEventListener('click', async () => {
+        const orgId = btn.dataset.orgId;
+        const form = $(`#addUserForm-${orgId}`);
+        const email = form.querySelector('.new-client-email').value;
+        const name = form.querySelector('.new-client-name').value;
+        const result = form.querySelector('.new-client-result');
+        try {
+          const res = await api(`/admin/clients/${orgId}/users`, { method: 'POST', body: JSON.stringify({ email, name }) });
+          result.innerHTML = `<div class="alert alert-success">Created! Temp password: <strong style="font-family:var(--mono)">${escapeHtml(res.data.temporary_password)}</strong><br><small>Share securely — must change on first login.</small></div>`;
+          setTimeout(() => renderClients(), 3000);
+        } catch (err) { result.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
+      }));
+    } catch (err) {
+      $('#mainContent').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
   // ===== ROUTER =====
   function route() {
     const hash = window.location.hash.replace('#/', '') || 'dashboard';
-    if (['dashboard', 'security', 'analytics', 'settings'].includes(hash)) {
-      state.page = hash;
+    const parts = hash.split('/');
+
+    if (parts[0] === 'projects' && parts[1]) {
+      state.page = 'projectDetail';
+      state.projectDetailId = parts[1];
+      return;
+    }
+    if (parts[0] === 'tickets' && parts[1]) {
+      state.page = 'ticketDetail';
+      state.ticketDetailId = parts[1];
+      return;
+    }
+    if (['dashboard', 'security', 'analytics', 'settings', 'projects', 'clients'].includes(parts[0])) {
+      state.page = parts[0];
     }
   }
 
@@ -846,6 +1376,10 @@
 
     route();
     switch (state.page) {
+      case 'projects': return renderProjects();
+      case 'projectDetail': return renderProjectDetail(state.projectDetailId);
+      case 'ticketDetail': return renderAdminTicketDetail(state.ticketDetailId);
+      case 'clients': return renderClients();
       case 'security': return renderSecurity();
       case 'analytics': return renderAnalytics();
       case 'settings': return renderSettings();

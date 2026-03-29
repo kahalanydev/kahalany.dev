@@ -1,9 +1,12 @@
 const express = require('express');
-const { getDb } = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const { getDb, generateId, logActivity, slugify, nextTicketNumber } = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireRole('admin', 'staff'));
 
 // GET /api/admin/dashboard
 router.get('/dashboard', (req, res) => {
@@ -224,6 +227,432 @@ router.get('/analytics', (req, res) => {
       hourlyDistribution
     }
   });
+});
+
+// ===== ORGANIZATIONS =====
+
+// GET /api/admin/clients — list all orgs
+router.get('/clients', (req, res) => {
+  const db = getDb();
+  const orgs = db.prepare(`
+    SELECT o.*, COUNT(DISTINCT p.id) as project_count,
+           COUNT(DISTINCT u.id) as user_count
+    FROM organizations o
+    LEFT JOIN projects p ON p.org_id = o.id
+    LEFT JOIN users u ON u.org_id = o.id
+    GROUP BY o.id ORDER BY o.created_at DESC
+  `).all();
+  res.json({ success: true, data: { organizations: orgs } });
+});
+
+// POST /api/admin/clients — create org
+router.post('/clients', (req, res) => {
+  const { name, primary_email, notes } = req.body;
+  if (!name || !primary_email) return res.status(400).json({ success: false, error: 'Name and email required' });
+
+  const db = getDb();
+  const id = generateId();
+  db.prepare('INSERT INTO organizations (id, name, primary_email, notes) VALUES (?, ?, ?, ?)')
+    .run(id, name.trim(), primary_email.trim().toLowerCase(), notes || null);
+
+  logActivity(db, { userId: req.user.id, action: 'org_created', entityType: 'organization', entityId: id,
+    details: { name }, ip: req.ip });
+
+  res.json({ success: true, data: { organization: { id, name, primary_email } } });
+});
+
+// PATCH /api/admin/clients/:orgId
+router.patch('/clients/:orgId', (req, res) => {
+  const db = getDb();
+  const org = db.prepare('SELECT * FROM organizations WHERE id = ?').get(req.params.orgId);
+  if (!org) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const { name, primary_email, notes } = req.body;
+  db.prepare('UPDATE organizations SET name = COALESCE(?, name), primary_email = COALESCE(?, primary_email), notes = COALESCE(?, notes), updated_at = datetime(\'now\') WHERE id = ?')
+    .run(name || null, primary_email || null, notes !== undefined ? notes : null, org.id);
+
+  res.json({ success: true, data: { message: 'Updated' } });
+});
+
+// POST /api/admin/clients/:orgId/users — create client user
+router.post('/clients/:orgId/users', (req, res) => {
+  const db = getDb();
+  const org = db.prepare('SELECT * FROM organizations WHERE id = ?').get(req.params.orgId);
+  if (!org) return res.status(404).json({ success: false, error: 'Organization not found' });
+
+  const { email, name } = req.body;
+  if (!email) return res.status(400).json({ success: false, error: 'Email required' });
+
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  if (existing) return res.status(409).json({ success: false, error: 'User with this email already exists' });
+
+  const password = crypto.randomBytes(12).toString('base64url');
+  const hash = bcrypt.hashSync(password, 12);
+  const result = db.prepare(
+    'INSERT INTO users (email, password_hash, name, role, org_id, must_change_password) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(email.toLowerCase().trim(), hash, name || null, 'client', org.id, 1);
+
+  logActivity(db, { userId: req.user.id, action: 'client_user_created', entityType: 'user', entityId: String(result.lastInsertRowid),
+    details: { email, org_name: org.name }, ip: req.ip });
+
+  res.json({ success: true, data: { user: { id: result.lastInsertRowid, email, name }, temporary_password: password } });
+});
+
+// GET /api/admin/clients/:orgId/users — list client users for org
+router.get('/clients/:orgId/users', (req, res) => {
+  const db = getDb();
+  const users = db.prepare('SELECT id, email, name, role, must_change_password, last_login_at, created_at FROM users WHERE org_id = ? ORDER BY created_at')
+    .all(req.params.orgId);
+  res.json({ success: true, data: { users } });
+});
+
+// ===== PROJECTS =====
+
+// GET /api/admin/projects — all projects
+router.get('/projects', (req, res) => {
+  const db = getDb();
+  const projects = db.prepare(`
+    SELECT p.*, o.name as org_name,
+           (SELECT COUNT(*) FROM tickets t WHERE t.project_id = p.id AND t.status IN ('open','in_progress')) as open_tickets,
+           (SELECT MAX(created_at) FROM activity_log a WHERE a.project_id = p.id) as last_activity
+    FROM projects p
+    JOIN organizations o ON o.id = p.org_id
+    ORDER BY p.updated_at DESC
+  `).all();
+  res.json({ success: true, data: { projects } });
+});
+
+// POST /api/admin/projects — create project
+router.post('/projects', (req, res) => {
+  const { org_id, name, description, tech_stack, target_date } = req.body;
+  if (!org_id || !name) return res.status(400).json({ success: false, error: 'Organization and name required' });
+
+  const db = getDb();
+  const org = db.prepare('SELECT * FROM organizations WHERE id = ?').get(org_id);
+  if (!org) return res.status(404).json({ success: false, error: 'Organization not found' });
+
+  const id = generateId();
+  let slug = slugify(name);
+  // Ensure unique slug
+  const existingSlug = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug);
+  if (existingSlug) slug = `${slug}-${Date.now().toString(36)}`;
+
+  db.prepare(`
+    INSERT INTO projects (id, org_id, name, slug, description, tech_stack, target_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, org_id, name.trim(), slug, description || null, tech_stack ? JSON.stringify(tech_stack) : null, target_date || null);
+
+  logActivity(db, { projectId: id, userId: req.user.id, action: 'project_created', entityType: 'project', entityId: id,
+    details: { name, org_name: org.name }, ip: req.ip });
+
+  res.json({ success: true, data: { project: { id, slug, name, status: 'planning' } } });
+});
+
+// GET /api/admin/projects/:projectId — full project detail
+router.get('/projects/:projectId', (req, res) => {
+  const db = getDb();
+  const project = db.prepare(`
+    SELECT p.*, o.name as org_name, o.primary_email as org_email
+    FROM projects p JOIN organizations o ON o.id = p.org_id
+    WHERE p.id = ?
+  `).get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const milestones = db.prepare('SELECT * FROM milestones WHERE project_id = ? ORDER BY sort_order').all(project.id);
+  const plan = db.prepare('SELECT * FROM project_plans WHERE project_id = ?').get(project.id);
+  const members = db.prepare(`
+    SELECT pm.*, u.email, u.name, u.role as user_role
+    FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ?
+  `).all(project.id);
+  const recentActivity = db.prepare(`
+    SELECT a.*, u.name as user_name, u.email as user_email
+    FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
+    WHERE a.project_id = ? ORDER BY a.created_at DESC LIMIT 20
+  `).all(project.id);
+
+  res.json({ success: true, data: { project, milestones, plan, members, recentActivity } });
+});
+
+// PATCH /api/admin/projects/:projectId — update project
+router.patch('/projects/:projectId', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const fields = ['name', 'description', 'status', 'tech_stack', 'repo_url', 'live_url', 'coolify_uuid', 'start_date', 'target_date'];
+  const updates = [];
+  const values = [];
+  for (const f of fields) {
+    if (req.body[f] !== undefined) {
+      updates.push(`${f} = ?`);
+      values.push(f === 'tech_stack' && Array.isArray(req.body[f]) ? JSON.stringify(req.body[f]) : req.body[f]);
+    }
+  }
+  if (updates.length === 0) return res.status(400).json({ success: false, error: 'No fields to update' });
+
+  updates.push("updated_at = datetime('now')");
+  values.push(project.id);
+  db.prepare(`UPDATE projects SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+  if (req.body.status && req.body.status !== project.status) {
+    logActivity(db, { projectId: project.id, userId: req.user.id, action: 'project_status_changed', entityType: 'project', entityId: project.id,
+      details: { old_status: project.status, new_status: req.body.status }, ip: req.ip });
+  }
+
+  res.json({ success: true, data: { message: 'Updated' } });
+});
+
+// POST /api/admin/projects/:projectId/propose — send plan to client
+router.post('/projects/:projectId/propose', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const plan = db.prepare('SELECT * FROM project_plans WHERE project_id = ?').get(project.id);
+  if (!plan) return res.status(400).json({ success: false, error: 'No plan exists for this project' });
+
+  db.prepare("UPDATE projects SET status = 'proposed', updated_at = datetime('now') WHERE id = ?").run(project.id);
+
+  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'project_proposed', entityType: 'project', entityId: project.id, ip: req.ip });
+
+  res.json({ success: true, data: { message: 'Plan sent to client for approval' } });
+});
+
+// ===== MILESTONES =====
+
+// POST /api/admin/projects/:projectId/milestones
+router.post('/projects/:projectId/milestones', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+  const { title, description, target_date, sort_order } = req.body;
+  if (!title) return res.status(400).json({ success: false, error: 'Title required' });
+
+  const id = generateId();
+  const order = sort_order ?? db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 as next FROM milestones WHERE project_id = ?').get(project.id).next;
+
+  db.prepare('INSERT INTO milestones (id, project_id, title, description, target_date, sort_order) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, project.id, title.trim(), description || null, target_date || null, order);
+
+  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'milestone_created', entityType: 'milestone', entityId: id,
+    details: { title }, ip: req.ip });
+
+  res.json({ success: true, data: { milestone: { id, title, status: 'upcoming', sort_order: order } } });
+});
+
+// PATCH /api/admin/milestones/:milestoneId
+router.patch('/milestones/:milestoneId', (req, res) => {
+  const db = getDb();
+  const ms = db.prepare('SELECT * FROM milestones WHERE id = ?').get(req.params.milestoneId);
+  if (!ms) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const { title, description, status, target_date, sort_order, completion_notes } = req.body;
+
+  const updates = [];
+  const values = [];
+  if (title !== undefined) { updates.push('title = ?'); values.push(title); }
+  if (description !== undefined) { updates.push('description = ?'); values.push(description); }
+  if (target_date !== undefined) { updates.push('target_date = ?'); values.push(target_date); }
+  if (sort_order !== undefined) { updates.push('sort_order = ?'); values.push(sort_order); }
+  if (completion_notes !== undefined) { updates.push('completion_notes = ?'); values.push(completion_notes); }
+  if (status !== undefined) {
+    updates.push('status = ?'); values.push(status);
+    if (status === 'completed' && ms.status !== 'completed') {
+      updates.push("completed_date = datetime('now')");
+    }
+  }
+
+  if (updates.length === 0) return res.status(400).json({ success: false, error: 'No fields to update' });
+
+  values.push(ms.id);
+  db.prepare(`UPDATE milestones SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+  // Recalculate project progress
+  if (status) {
+    const total = db.prepare('SELECT COUNT(*) as c FROM milestones WHERE project_id = ?').get(ms.project_id).c;
+    const done = db.prepare("SELECT COUNT(*) as c FROM milestones WHERE project_id = ? AND status = 'completed'").get(ms.project_id).c;
+    const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+    db.prepare("UPDATE projects SET progress_percent = ?, updated_at = datetime('now') WHERE id = ?").run(progress, ms.project_id);
+
+    logActivity(db, { projectId: ms.project_id, userId: req.user.id, action: 'milestone_status_changed', entityType: 'milestone', entityId: ms.id,
+      details: { title: ms.title, old_status: ms.status, new_status: status }, ip: req.ip });
+  }
+
+  res.json({ success: true, data: { message: 'Updated' } });
+});
+
+// DELETE /api/admin/milestones/:milestoneId
+router.delete('/milestones/:milestoneId', (req, res) => {
+  const db = getDb();
+  const ms = db.prepare('SELECT * FROM milestones WHERE id = ?').get(req.params.milestoneId);
+  if (!ms) return res.status(404).json({ success: false, error: 'Not found' });
+  db.prepare('DELETE FROM milestones WHERE id = ?').run(ms.id);
+  res.json({ success: true, data: { message: 'Deleted' } });
+});
+
+// ===== PROJECT PLANS =====
+
+// POST /api/admin/projects/:projectId/plan
+router.post('/projects/:projectId/plan', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ success: false, error: 'Plan content required' });
+
+  const existing = db.prepare('SELECT * FROM project_plans WHERE project_id = ?').get(project.id);
+  if (existing) {
+    db.prepare("UPDATE project_plans SET content = ?, version = version + 1, updated_at = datetime('now') WHERE project_id = ?")
+      .run(content, project.id);
+  } else {
+    db.prepare('INSERT INTO project_plans (id, project_id, content) VALUES (?, ?, ?)')
+      .run(generateId(), project.id, content);
+  }
+
+  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'plan_updated', entityType: 'plan', entityId: project.id, ip: req.ip });
+  res.json({ success: true, data: { message: 'Plan saved' } });
+});
+
+// ===== TICKETS (admin view) =====
+
+// GET /api/admin/projects/:projectId/tickets
+router.get('/projects/:projectId/tickets', (req, res) => {
+  const db = getDb();
+  const { status, type, sort } = req.query;
+  let sql = `
+    SELECT t.*, u.name as created_by_name, u.email as created_by_email,
+           a.name as assigned_to_name
+    FROM tickets t
+    LEFT JOIN users u ON u.id = t.created_by
+    LEFT JOIN users a ON a.id = t.assigned_to
+    WHERE t.project_id = ?
+  `;
+  const params = [req.params.projectId];
+  if (status && status !== 'all') { sql += ' AND t.status = ?'; params.push(status); }
+  if (type && type !== 'all') { sql += ' AND t.type = ?'; params.push(type); }
+  sql += sort === 'priority' ? ' ORDER BY CASE t.priority WHEN \'urgent\' THEN 0 WHEN \'high\' THEN 1 WHEN \'medium\' THEN 2 ELSE 3 END, t.created_at DESC'
+    : ' ORDER BY t.created_at DESC';
+  sql += ' LIMIT 100';
+
+  res.json({ success: true, data: { tickets: db.prepare(sql).all(...params) } });
+});
+
+// GET /api/admin/tickets/:ticketId — full ticket with comments (including internal)
+router.get('/tickets/:ticketId', (req, res) => {
+  const db = getDb();
+  const ticket = db.prepare(`
+    SELECT t.*, u.name as created_by_name, u.email as created_by_email,
+           a.name as assigned_to_name, p.name as project_name, p.slug as project_slug
+    FROM tickets t
+    LEFT JOIN users u ON u.id = t.created_by
+    LEFT JOIN users a ON a.id = t.assigned_to
+    LEFT JOIN projects p ON p.id = t.project_id
+    WHERE t.id = ?
+  `).get(req.params.ticketId);
+  if (!ticket) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const comments = db.prepare(`
+    SELECT c.*, u.name as user_name, u.email as user_email, u.role as user_role
+    FROM ticket_comments c LEFT JOIN users u ON u.id = c.user_id
+    WHERE c.ticket_id = ? ORDER BY c.created_at
+  `).all(ticket.id);
+
+  res.json({ success: true, data: { ticket, comments } });
+});
+
+// PATCH /api/admin/tickets/:ticketId — update ticket (assign, status, priority)
+router.patch('/tickets/:ticketId', (req, res) => {
+  const db = getDb();
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.ticketId);
+  if (!ticket) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const { assigned_to, status, priority, due_date } = req.body;
+  const updates = ["updated_at = datetime('now')"];
+  const values = [];
+
+  if (assigned_to !== undefined) { updates.push('assigned_to = ?'); values.push(assigned_to); }
+  if (priority) { updates.push('priority = ?'); values.push(priority); }
+  if (due_date !== undefined) { updates.push('due_date = ?'); values.push(due_date); }
+  if (status) {
+    updates.push('status = ?'); values.push(status);
+    if (['completed', 'closed'].includes(status) && !['completed', 'closed'].includes(ticket.status)) {
+      updates.push("closed_at = datetime('now')");
+    }
+  }
+
+  values.push(ticket.id);
+  db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+  if (status && status !== ticket.status) {
+    logActivity(db, { projectId: ticket.project_id, userId: req.user.id, action: 'ticket_status_changed',
+      entityType: 'ticket', entityId: ticket.id,
+      details: { ticket_number: ticket.ticket_number, old_status: ticket.status, new_status: status }, ip: req.ip });
+  }
+
+  res.json({ success: true, data: { message: 'Updated' } });
+});
+
+// POST /api/admin/tickets/:ticketId/comments — add comment (can be internal)
+router.post('/tickets/:ticketId/comments', (req, res) => {
+  const db = getDb();
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.ticketId);
+  if (!ticket) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const { body, is_internal } = req.body;
+  if (!body || !body.trim()) return res.status(400).json({ success: false, error: 'Comment body required' });
+  if (body.length > 5000) return res.status(400).json({ success: false, error: 'Comment too long (max 5000 chars)' });
+
+  const id = generateId();
+  db.prepare('INSERT INTO ticket_comments (id, ticket_id, user_id, body, is_internal) VALUES (?, ?, ?, ?, ?)')
+    .run(id, ticket.id, req.user.id, body.trim(), is_internal ? 1 : 0);
+
+  db.prepare("UPDATE tickets SET updated_at = datetime('now') WHERE id = ?").run(ticket.id);
+
+  if (!is_internal) {
+    logActivity(db, { projectId: ticket.project_id, userId: req.user.id, action: 'comment_added',
+      entityType: 'ticket', entityId: ticket.id,
+      details: { ticket_number: ticket.ticket_number }, ip: req.ip });
+  }
+
+  res.json({ success: true, data: { comment: { id, body: body.trim(), is_internal: !!is_internal } } });
+});
+
+// ===== DEV API KEYS =====
+
+// GET /api/admin/dev-keys
+router.get('/dev-keys', requireRole('admin'), (req, res) => {
+  const db = getDb();
+  const keys = db.prepare('SELECT id, key_id, label, revoked, expires_at, created_at, last_used_at FROM dev_keys ORDER BY created_at DESC').all();
+  res.json({ success: true, data: { keys } });
+});
+
+// POST /api/admin/dev-keys — generate new key
+router.post('/dev-keys', requireRole('admin'), (req, res) => {
+  const db = getDb();
+  const { label, expires_days } = req.body;
+
+  const id = generateId();
+  const keyId = crypto.randomBytes(8).toString('hex');
+  const secret = crypto.randomBytes(32).toString('hex');
+  const expiresAt = expires_days ? new Date(Date.now() + expires_days * 86400000).toISOString() : null;
+
+  db.prepare('INSERT INTO dev_keys (id, key_id, secret, label, expires_at) VALUES (?, ?, ?, ?, ?)')
+    .run(id, keyId, secret, label || null, expiresAt);
+
+  logActivity(db, { userId: req.user.id, action: 'dev_key_created', entityType: 'dev_key', entityId: id,
+    details: { label, key_id: keyId }, ip: req.ip });
+
+  res.json({ success: true, data: { key_id: keyId, secret, label, expires_at: expiresAt,
+    message: 'Save the secret now — it will not be shown again.' } });
+});
+
+// DELETE /api/admin/dev-keys/:keyId — revoke key
+router.delete('/dev-keys/:keyId', requireRole('admin'), (req, res) => {
+  const db = getDb();
+  db.prepare('UPDATE dev_keys SET revoked = 1 WHERE key_id = ?').run(req.params.keyId);
+  res.json({ success: true, data: { message: 'Key revoked' } });
 });
 
 module.exports = router;
