@@ -169,10 +169,10 @@ router.post('/users/:id/reset', requireAuth, (req, res) => {
   res.json({ success: true, data: { invite_url: inviteUrl } });
 });
 
-// GET /api/auth/users — list admins/staff only (Settings page)
+// GET /api/auth/users — list all users (Settings page)
 router.get('/users', requireAuth, (req, res) => {
   const db = getDb();
-  const users = db.prepare("SELECT id, email, name, role, must_change_password, created_at FROM users WHERE role IN ('admin', 'staff') ORDER BY created_at").all();
+  const users = db.prepare("SELECT id, email, name, role, must_change_password, created_at FROM users ORDER BY role, created_at").all();
   res.json({ success: true, data: { users } });
 });
 

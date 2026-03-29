@@ -815,19 +815,25 @@
 
           <div class="card">
             <div class="card-header">
-              <span class="card-title">Administrators</span>
+              <span class="card-title">Users</span>
             </div>
             <div id="usersMsg"></div>
             <div class="table-wrap" style="margin-bottom:20px">
               <table>
-                <thead><tr><th>Email</th><th>Name</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
                 <tbody>
-                  ${users.map(u => `<tr>
+                  ${users.map(u => {
+                    const roleBadge = u.role === 'admin' ? '<span class="badge badge-blue">admin</span>'
+                      : u.role === 'staff' ? '<span class="badge badge-purple" style="background:rgba(168,85,247,0.15);color:#c084fc">staff</span>'
+                      : '<span class="badge badge-green">client</span>';
+                    return `<tr>
                     <td>${escapeHtml(u.email)}</td>
                     <td>${escapeHtml(u.name || '-')}</td>
+                    <td>${roleBadge}</td>
                     <td>${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
                     <td>${u.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" data-reset-user="${u.id}" style="margin-right:4px">Reset PW</button><button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Remove</button>` : '<span class="badge badge-blue">you</span>'}</td>
-                  </tr>`).join('')}
+                  </tr>`;
+                  }).join('')}
                 </tbody>
               </table>
             </div>
