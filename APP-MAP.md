@@ -72,6 +72,7 @@ Client → Traefik (SSL) → Express (:8080)
   ├── /api/track/*         → tracking endpoints (visits, events)
   ├── /api/admin/*         → admin data API (requires JWT + admin/staff role)
   ├── /api/portal/*        → portal data API (requires JWT + org-scoped access)
+  ├── /api/dev/*           → dev API (requires HMAC signature, for Claude Code sync)
   └── 404                  → suspicious activity logger
 ```
 

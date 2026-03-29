@@ -291,10 +291,75 @@ Built a full client portal system allowing clients to view project progress, sub
 | `PROGRESS.md` | This entry |
 
 ### Remaining Phases
-- **Phase 2**: Dev API & Claude Code integration (HMAC endpoints, portal sync service, project scaffolding)
 - **Phase 3**: Project Plans & Approval flow polish (plan versioning, markdown editor)
 - **Phase 4**: File Uploads & Polish (Multer, email notifications, mobile)
 - **Phase 5**: PCG Pilot (real client onboarding)
+
+---
+
+## 2026-03-29 — Google OAuth + Dev API & Claude Integration (Phase 2)
+
+### Google OAuth Infrastructure
+- Server-side OAuth2 flow using native `fetch` (no extra npm dependencies)
+- Admin configures Google Client ID/Secret in Settings > Google OAuth section
+- OAuth config stored in `config` table (key-value): `google_client_id`, `google_client_secret`, `google_oauth_enabled`
+- Public status endpoint: `GET /api/auth/oauth/status` — frontend checks if Google sign-in is available
+- OAuth flow: `GET /api/auth/google?target=portal|admin` → Google consent → `/api/auth/google/callback`
+- CSRF protection via cryptographic state tokens (5-min TTL, in-memory Map)
+- Role validation: portal requires `client` role, admin requires `admin/staff`
+- Google profile data (`google_id`, `avatar_url`) stored on user record
+- "Sign in with Google" button on both portal and admin login pages (conditional on config)
+- Admin Settings shows the redirect URI for Google Cloud Console setup
+- **Security**: Only works for pre-existing users (admin must create accounts first, no self-registration)
+
+### Dev API (`server/routes/dev.js`)
+All endpoints require HMAC-signed auth (`requireDevAuth` middleware).
+
+- `GET /api/dev/sync` — Pull everything changed since last sync for a project (milestones, new/updated/closed tickets with latest comments)
+- `GET /api/dev/projects/pending` — List approved but unscaffolded projects (with plan content and milestones)
+- `POST /api/dev/projects/:id/scaffolded` — Mark project as scaffolded, set status to `in_progress`, start first milestone
+- `POST /api/dev/progress` — Push milestone updates with auto-progress recalculation; auto-advances next milestone on completion; projects move to `review` when all milestones complete
+- `POST /api/dev/tickets/:id/resolve` — Close ticket with resolution notes (adds public comment)
+- `GET /api/dev/tickets/:id/full` — Complete ticket detail with ALL comments (including internal)
+- `POST /api/dev/activity` — Log dev events (code_pushed, deploy_triggered, repo_created, etc.)
+
+### Portal Sync Service (in Claude-Code-Desk-Mobile)
+Background service in the Claude Code UI server that keeps local project folders in sync.
+
+**File**: `claude-code-ui-mobile/server/portal-sync.js`
+
+- HMAC-signed API client for kahalany.dev dev endpoints
+- Polls every 5 minutes + startup sync (5s delayed)
+- **Scaffolding**: Creates project folder in `C:\KDEV\{slug}`, writes `CLAUDE.md` (with plan, milestones, workflow), `.portal.json`, `.portal/tickets/`
+- **Pull sync**: Fetches new tickets → writes `.portal/tickets/{number}.md` files; removes closed ticket files; updates `.portal.json` milestone statuses
+- **Push sync**: Reads `.portal.json` for dirty milestone updates → pushes to server → clears dirty flags
+- **Settings API**: `GET/PATCH /api/settings/portal` for dev API key config, `POST /portal/sync` for manual trigger, `POST /portal/test` for connection test
+- Wired into server startup (auto-starts if configured) and graceful shutdown
+
+### CLAUDE.md Template Generator
+Generates project-specific `CLAUDE.md` with:
+- Project info (portal ID, client, tech stack)
+- "On Every Conversation" instructions (read .portal.json, check tickets, update milestones)
+- Full project plan content
+- Milestone checklist with status indicators
+- Workflow instructions for Claude Code
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `server/routes/dev.js` | Dev API endpoints (~283 lines) |
+| `Claude-Code-Desk-Mobile/.../portal-sync.js` | Portal sync service (~300 lines) |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/routes/auth.js` | Google OAuth flow, config API, status endpoint (~170 lines added) |
+| `server/db.js` | Added scaffolded_at column to projects, google_id/avatar_url to users |
+| `server/index.js` | Added dev routes |
+| `admin/app.js` | Google OAuth settings card in Settings page, "Sign in with Google" on login |
+| `portal/app.js` | "Sign in with Google" button on login page with error handling |
+| `Claude-Code-Desk-Mobile/.../settings.js` | Portal sync settings endpoints |
+| `Claude-Code-Desk-Mobile/.../index.js` | Portal sync startup and shutdown |
 
 ---
 
