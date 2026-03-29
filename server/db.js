@@ -248,6 +248,7 @@ function initSchema() {
       project_id TEXT NOT NULL REFERENCES projects(id),
       user_id INTEGER NOT NULL REFERENCES users(id),
       role TEXT NOT NULL DEFAULT 'member',
+      added_by INTEGER,
       added_at TEXT DEFAULT (datetime('now')),
       UNIQUE(project_id, user_id)
     );
@@ -386,6 +387,7 @@ function initSchema() {
   safeAlter('ALTER TABLE users ADD COLUMN invite_token TEXT');
   safeAlter('ALTER TABLE users ADD COLUMN invite_expires_at TEXT');
   safeAlter('ALTER TABLE projects ADD COLUMN scaffolded_at TEXT');
+  safeAlter('ALTER TABLE project_members ADD COLUMN added_by INTEGER');
 
   // Plan version history
   db.run(`

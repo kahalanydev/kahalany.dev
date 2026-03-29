@@ -297,7 +297,7 @@ router.post('/clients/:orgId/users', (req, res) => {
       for (const p of projects) {
         const already = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(p.id, existing.id);
         if (!already) {
-          db.prepare('INSERT INTO project_members (project_id, user_id, added_by) VALUES (?, ?, ?)').run(p.id, existing.id, req.user.id);
+          db.prepare('INSERT INTO project_members (id, project_id, user_id, added_by) VALUES (?, ?, ?, ?)').run(generateId(), p.id, existing.id, req.user.id);
           added++;
         }
       }
