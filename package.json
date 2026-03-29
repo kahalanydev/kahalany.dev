@@ -1,0 +1,19 @@
+{
+  "name": "kahalany-dev-site",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Kahalany.Dev portfolio site with admin analytics panel",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "sql.js": "^1.12.0",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "ua-parser-js": "^1.0.39"
+  }
+}

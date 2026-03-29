@@ -19,10 +19,10 @@
                 <span class="logo-bracket">{</span> kahalany<span class="logo-dot">.</span>dev <span class="logo-bracket">}</span>
             </a>
             <div class="nav-links" id="navLinks">
-                <a href="#work">Work</a>
-                <a href="#capabilities">Capabilities</a>
-                <a href="#process">Process</a>
-                <a href="#contact" class="nav-cta">Let's Talk</a>
+                <a href="#work" data-track="nav-work">Work</a>
+                <a href="#capabilities" data-track="nav-capabilities">Capabilities</a>
+                <a href="#process" data-track="nav-process">Process</a>
+                <a href="#contact" class="nav-cta" data-track="nav-contact">Let's Talk</a>
             </div>
             <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu">
                 <span></span><span></span><span></span>
@@ -31,7 +31,7 @@
     </nav>
 
     <!-- HERO -->
-    <section class="hero">
+    <section class="hero" id="hero">
         <div class="hero-bg">
             <div class="grid-lines"></div>
         </div>
@@ -56,8 +56,8 @@
                 </div>
             </div>
             <div class="hero-actions">
-                <a href="#work" class="btn btn-primary">See Our Work</a>
-                <a href="#contact" class="btn btn-secondary">Start a Project</a>
+                <a href="#work" class="btn btn-primary" data-track="cta-see-work">See Our Work</a>
+                <a href="#contact" class="btn btn-secondary" data-track="cta-start-project">Start a Project</a>
             </div>
         </div>
         <div class="hero-scroll">
@@ -75,11 +75,11 @@
             </div>
 
             <div class="project-filters">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="web">Web Apps</button>
-                <button class="filter-btn" data-filter="mobile">Mobile</button>
-                <button class="filter-btn" data-filter="ai">AI / ML</button>
-                <button class="filter-btn" data-filter="wordpress">WordPress</button>
+                <button class="filter-btn active" data-filter="all" data-track="filter-all">All</button>
+                <button class="filter-btn" data-filter="web" data-track="filter-web">Web Apps</button>
+                <button class="filter-btn" data-filter="mobile" data-track="filter-mobile">Mobile</button>
+                <button class="filter-btn" data-filter="ai" data-track="filter-ai">AI / ML</button>
+                <button class="filter-btn" data-filter="wordpress" data-track="filter-wordpress">WordPress</button>
             </div>
 
             <div class="projects-grid">
@@ -143,7 +143,7 @@
                             <span>SMS notifications</span>
                             <span>PWA</span>
                         </div>
-                        <a href="https://nodeai.kahalany.dev" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                        <a href="https://nodeai.kahalany.dev" target="_blank" rel="noopener" class="project-link" data-track="project-nodeai">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
                     </div>
                 </div>
 
@@ -203,7 +203,7 @@
                             <span>Thesis generator</span>
                             <span>Dark/light theme</span>
                         </div>
-                        <a href="https://predictable.kahalany.dev" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                        <a href="https://predictable.kahalany.dev" target="_blank" rel="noopener" class="project-link" data-track="project-predictable">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
                     </div>
                 </div>
 
@@ -314,7 +314,7 @@
                             <span>Coverage maps</span>
                             <span>Service worker</span>
                         </div>
-                        <a href="https://torahtracker.app" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                        <a href="https://torahtracker.app" target="_blank" rel="noopener" class="project-link" data-track="project-torahtracker">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
                     </div>
                 </div>
 
@@ -420,7 +420,7 @@
                             <span>Spam protection</span>
                             <span>Testimonials</span>
                         </div>
-                        <a href="https://davenen.kahalany.dev" target="_blank" rel="noopener" class="project-link">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
+                        <a href="https://davenen.kahalany.dev" target="_blank" rel="noopener" class="project-link" data-track="project-davenen">View Live <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"/></svg></a>
                     </div>
                 </div>
 
@@ -795,7 +795,7 @@
                     <h2>Got an idea?<br>Let's build it.</h2>
                     <p>Whether it's a web app, mobile app, AI tool, WordPress plugin, or something entirely custom — we'll take it from concept to production.</p>
                     <div class="contact-methods">
-                        <a href="mailto:hello@kahalany.dev" class="contact-method">
+                        <a href="mailto:hello@kahalany.dev" class="contact-method" data-track="contact-email">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                             <div>
                                 <span class="contact-label">Email</span>
@@ -842,5 +842,6 @@
     </footer>
 
     <script src="script.js"></script>
+    <script src="tracker.js" defer></script>
 </body>
 </html>
