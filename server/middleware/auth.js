@@ -81,7 +81,7 @@ function requireDevAuth(req, res, next) {
   // Verify HMAC signature
   const bodyStr = JSON.stringify(req.body) || '';
   const bodyHash = crypto.createHash('sha256').update(bodyStr).digest('hex');
-  const payload = `${req.method}\n${req.path}\n${timestamp}\n${bodyHash}`;
+  const payload = `${req.method}\n${req.originalUrl}\n${timestamp}\n${bodyHash}`;
   const expected = crypto.createHmac('sha256', key.secret).update(payload).digest('hex');
 
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) {
