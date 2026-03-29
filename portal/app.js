@@ -137,6 +137,30 @@
     }
   }
 
+  // ===== MARKDOWN RENDERER =====
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = text;
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--surface-3);padding:12px;border-radius:var(--radius);overflow-x:auto;font-size:12px"><code>$2</code></pre>');
+    html = html.replace(/`([^`]+)`/g, '<code style="background:var(--surface-3);padding:2px 6px;border-radius:3px;font-size:12px">$1</code>');
+    html = html.replace(/^#### (.+)$/gm, '<h4 style="font-size:14px;margin:16px 0 8px;color:var(--text)">$1</h4>');
+    html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:15px;margin:18px 0 8px;color:var(--text)">$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:17px;margin:20px 0 10px;color:var(--text)">$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:20px;margin:24px 0 12px;color:var(--text)">$1</h1>');
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">');
+    html = html.replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;color:var(--text-secondary)">$1</li>');
+    html = html.replace(/^\d+\. (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;list-style:decimal;color:var(--text-secondary)">$1</li>');
+    html = html.replace(/\[x\]/g, '<span style="color:var(--success)">&#9745;</span>');
+    html = html.replace(/\[ \]/g, '<span style="color:var(--text-dim)">&#9744;</span>');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--accent)">$1</a>');
+    html = html.replace(/\n\n/g, '<br><br>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  }
+
   // ===== RENDER: LOGIN =====
   async function renderLogin() {
     // Check for OAuth error in URL
@@ -239,6 +263,7 @@
     const navItems = state.projectId
       ? [
           { id: 'project', icon: '\u25A3', label: 'Overview', hash: `#/project/${state.projectId}` },
+          { id: 'plan', icon: '\u2630', label: 'Plan', hash: `#/project/${state.projectId}/plan` },
           { id: 'tickets', icon: '\u2709', label: 'Tickets', hash: `#/project/${state.projectId}/tickets` },
           { id: 'activity', icon: '\u25CE', label: 'Activity', hash: `#/project/${state.projectId}/activity` },
         ]
@@ -443,15 +468,33 @@
             <span class="card-title">Plan v${plan.version}</span>
             <span style="font-size:12px;color:var(--text-dim)">Last updated: ${formatDate(plan.updated_at)}</span>
           </div>
-          <div class="plan-content">${escapeHtml(plan.content)}</div>
+          <div class="plan-content md-rendered" style="line-height:1.6;color:var(--text-secondary)">${renderMarkdown(escapeHtml(plan.content))}</div>
         </div>
 
         ${project_status === 'proposed' ? `
-          <div class="approve-section">
+          <div class="approve-section" style="display:flex;flex-direction:column;gap:16px;align-items:center">
             <p>If you're happy with this plan, approve it to begin development.</p>
-            <button class="btn btn-success" id="approveBtn" style="width:auto;padding:14px 40px;font-size:16px">
-              Approve Project
-            </button>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+              <button class="btn btn-success" id="approveBtn" style="width:auto;padding:14px 40px;font-size:16px">
+                Approve Project
+              </button>
+              <button class="btn btn-secondary" id="feedbackBtn" style="width:auto;padding:14px 24px;font-size:14px">
+                Request Changes
+              </button>
+            </div>
+          </div>
+
+          <div id="feedbackForm" style="display:none;margin-top:16px">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Plan Feedback</span></div>
+              <p style="color:var(--text-dim);font-size:13px;margin-bottom:12px">Describe what changes you'd like. This will create a ticket for our team.</p>
+              <textarea id="feedbackText" placeholder="What would you like changed in the plan?" style="width:100%;min-height:120px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14px;resize:vertical;line-height:1.5"></textarea>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-primary" id="submitFeedbackBtn" style="width:auto">Submit Feedback</button>
+                <button class="btn btn-secondary" id="cancelFeedbackBtn" style="width:auto">Cancel</button>
+              </div>
+              <div id="feedbackMsg" style="margin-top:8px"></div>
+            </div>
           </div>
         ` : plan.approved_at ? `
           <div class="alert alert-success">This plan was approved on ${formatDate(plan.approved_at)}.</div>
@@ -469,6 +512,42 @@
           } catch (err) {
             alert(err.message);
             approveBtn.textContent = 'Approve Project'; approveBtn.disabled = false;
+          }
+        });
+      }
+
+      // Feedback form toggle
+      const feedbackBtn = $('#feedbackBtn');
+      if (feedbackBtn) {
+        feedbackBtn.addEventListener('click', () => {
+          $('#feedbackForm').style.display = 'block';
+          feedbackBtn.style.display = 'none';
+        });
+        $('#cancelFeedbackBtn').addEventListener('click', () => {
+          $('#feedbackForm').style.display = 'none';
+          feedbackBtn.style.display = 'inline-flex';
+        });
+        $('#submitFeedbackBtn').addEventListener('click', async () => {
+          const text = $('#feedbackText').value.trim();
+          if (!text) { $('#feedbackMsg').innerHTML = '<div class="alert alert-error">Please describe the changes you want.</div>'; return; }
+          const btn = $('#submitFeedbackBtn');
+          btn.textContent = 'Submitting...'; btn.disabled = true;
+          try {
+            await api(`/portal/projects/${projectId}/tickets`, {
+              method: 'POST',
+              body: JSON.stringify({
+                title: 'Plan feedback: ' + text.substring(0, 80) + (text.length > 80 ? '...' : ''),
+                type: 'modification',
+                priority: 'medium',
+                description: text
+              })
+            });
+            $('#feedbackMsg').innerHTML = '<div class="alert alert-success">Feedback submitted! We\'ll review and update the plan.</div>';
+            $('#feedbackText').value = '';
+            btn.textContent = 'Submit Feedback'; btn.disabled = false;
+          } catch (err) {
+            $('#feedbackMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+            btn.textContent = 'Submit Feedback'; btn.disabled = false;
           }
         });
       }

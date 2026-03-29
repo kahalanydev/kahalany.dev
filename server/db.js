@@ -372,6 +372,19 @@ function initSchema() {
   safeAlter('ALTER TABLE users ADD COLUMN google_id TEXT');
   safeAlter('ALTER TABLE users ADD COLUMN avatar_url TEXT');
   safeAlter('ALTER TABLE projects ADD COLUMN scaffolded_at TEXT');
+
+  // Plan version history
+  db.run(`
+    CREATE TABLE IF NOT EXISTS plan_versions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      content TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      saved_by INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+  db.run('CREATE INDEX IF NOT EXISTS idx_plan_versions_project ON plan_versions(project_id);');
 }
 
 function getJwtSecret() {

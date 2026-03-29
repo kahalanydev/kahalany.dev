@@ -94,6 +94,40 @@
     return `<span class="badge ${map[severity] || 'badge-gray'}">${severity}</span>`;
   }
 
+  // ===== MARKDOWN RENDERER =====
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = text;
+    // Code blocks (``` ... ```)
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code style="background:var(--surface-3);padding:2px 6px;border-radius:3px;font-size:12px">$1</code>');
+    // Headings
+    html = html.replace(/^#### (.+)$/gm, '<h4 style="font-size:14px;margin:16px 0 8px;color:var(--text)">$1</h4>');
+    html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:15px;margin:18px 0 8px;color:var(--text)">$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:17px;margin:20px 0 10px;color:var(--text)">$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:20px;margin:24px 0 12px;color:var(--text)">$1</h1>');
+    // Bold and italic
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Horizontal rule
+    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">');
+    // Unordered lists
+    html = html.replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;color:var(--text-secondary)">$1</li>');
+    // Ordered lists
+    html = html.replace(/^\d+\. (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;list-style:decimal;color:var(--text-secondary)">$1</li>');
+    // Checkboxes
+    html = html.replace(/\[x\]/g, '<span style="color:var(--success)">&#9745;</span>');
+    html = html.replace(/\[ \]/g, '<span style="color:var(--text-dim)">&#9744;</span>');
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--accent)">$1</a>');
+    // Line breaks (double newline = paragraph)
+    html = html.replace(/\n\n/g, '<br><br>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  }
+
   // ===== CHART HELPERS =====
   const chartDefaults = {
     responsive: true,
@@ -1087,20 +1121,29 @@
           <div class="card">
             <div class="card-header">
               <span class="card-title">Project Plan</span>
-              <div>
-                ${plan ? `<span style="font-size:11px;color:var(--text-dim);margin-right:8px">v${plan.version}</span>` : ''}
+              <div style="display:flex;align-items:center;gap:8px">
+                ${plan ? `<span style="font-size:11px;color:var(--text-dim)">v${plan.version}</span>` : ''}
+                ${plan ? `<button class="btn btn-secondary btn-sm" id="planHistoryBtn">History</button>` : ''}
                 <button class="btn btn-secondary btn-sm" id="editPlanBtn">${plan ? 'Edit' : 'Create'} Plan</button>
               </div>
             </div>
             <div id="planEditor" style="display:none;margin-bottom:16px">
-              <textarea id="planContent" style="width:100%;min-height:200px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;resize:vertical">${plan ? escapeHtml(plan.content) : ''}</textarea>
-              <div style="display:flex;gap:8px;margin-top:8px">
-                <button class="btn btn-primary btn-sm" id="savePlanBtn">Save Plan</button>
-                ${project.status === 'planning' && plan ? `<button class="btn btn-secondary btn-sm" id="proposePlanBtn">Send to Client</button>` : ''}
+              <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px">
+                <button class="btn btn-sm planTabBtn active" data-tab="write" style="font-size:12px">Write</button>
+                <button class="btn btn-sm planTabBtn" data-tab="preview" style="font-size:12px">Preview</button>
               </div>
-              <div id="planMsg" style="margin-top:8px"></div>
+              <div id="planWriteTab">
+                <textarea id="planContent" style="width:100%;min-height:300px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;resize:vertical;line-height:1.6">${plan ? escapeHtml(plan.content) : ''}</textarea>
+              </div>
+              <div id="planPreviewTab" style="display:none;min-height:300px;padding:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px" class="md-rendered"></div>
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <button class="btn btn-primary btn-sm" id="savePlanBtn">Save Plan</button>
+                ${['planning', 'proposed'].includes(project.status) && plan ? `<button class="btn btn-secondary btn-sm" id="proposePlanBtn" style="background:var(--success);border-color:var(--success);color:#fff">${project.status === 'proposed' ? 'Re-send to Client' : 'Send to Client'}</button>` : ''}
+                <span id="planMsg" style="font-size:12px"></span>
+              </div>
             </div>
-            ${plan ? `<div style="max-height:200px;overflow-y:auto;font-size:13px;color:var(--text-secondary);white-space:pre-wrap;line-height:1.5">${escapeHtml(plan.content).substring(0, 500)}${plan.content.length > 500 ? '...' : ''}</div>` :
+            <div id="planVersionsPanel" style="display:none;margin-bottom:16px"></div>
+            ${plan ? `<div id="planDisplay" class="md-rendered" style="max-height:300px;overflow-y:auto;font-size:13px;line-height:1.6">${renderMarkdown(escapeHtml(plan.content))}</div>` :
               '<p style="color:var(--text-dim);font-size:13px">No plan created yet.</p>'}
           </div>
         </div>
@@ -1171,27 +1214,100 @@
       // Plan editor
       $('#editPlanBtn').addEventListener('click', () => {
         const editor = $('#planEditor');
+        const display = $('#planDisplay');
         editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+        if (display) display.style.display = editor.style.display === 'none' ? 'block' : 'none';
       });
+
+      // Write/Preview tabs
+      $$('.planTabBtn').forEach(btn => btn.addEventListener('click', () => {
+        $$('.planTabBtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        const writeTab = $('#planWriteTab');
+        const previewTab = $('#planPreviewTab');
+        if (tab === 'write') { writeTab.style.display = 'block'; previewTab.style.display = 'none'; }
+        else { writeTab.style.display = 'none'; previewTab.style.display = 'block'; previewTab.innerHTML = renderMarkdown(escapeHtml($('#planContent').value)); }
+      }));
+
       $('#savePlanBtn').addEventListener('click', async () => {
+        const msg = $('#planMsg');
         try {
-          await api(`/admin/projects/${projectId}/plan`, { method: 'POST', body: JSON.stringify({ content: $('#planContent').value }) });
-          renderProjectDetail(projectId);
+          const result = await api(`/admin/projects/${projectId}/plan`, { method: 'POST', body: JSON.stringify({ content: $('#planContent').value }) });
+          if (msg) msg.innerHTML = `<span class="badge badge-green">Saved (v${result.data.version})</span>`;
+          setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
+          // Update preview display if visible
+          const display = $('#planDisplay');
+          if (display) display.innerHTML = renderMarkdown(escapeHtml($('#planContent').value));
         } catch (err) {
-          const msg = $('#planMsg');
-          if (msg) msg.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+          if (msg) msg.innerHTML = `<span class="badge badge-red">${escapeHtml(err.message)}</span>`;
         }
       });
+
       const proposeBtn = $('#proposePlanBtn');
       if (proposeBtn) {
         proposeBtn.addEventListener('click', async () => {
           if (!confirm('This will send the plan to the client for approval. Continue?')) return;
           try {
-            // Save plan first, then propose
             await api(`/admin/projects/${projectId}/plan`, { method: 'POST', body: JSON.stringify({ content: $('#planContent').value }) });
             await api(`/admin/projects/${projectId}/propose`, { method: 'POST' });
             renderProjectDetail(projectId);
           } catch (err) { alert(err.message); }
+        });
+      }
+
+      // Version history
+      const histBtn = $('#planHistoryBtn');
+      if (histBtn) {
+        histBtn.addEventListener('click', async () => {
+          const panel = $('#planVersionsPanel');
+          if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+          panel.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+          panel.style.display = 'block';
+          try {
+            const res = await api(`/admin/projects/${projectId}/plan/versions`);
+            const versions = res.data.versions;
+            if (versions.length === 0) {
+              panel.innerHTML = '<p style="color:var(--text-dim);font-size:13px;padding:8px">No previous versions.</p>';
+              return;
+            }
+            panel.innerHTML = `
+              <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+                <div style="padding:8px 12px;background:var(--surface-3);font-size:12px;font-weight:600;color:var(--text-dim)">Version History</div>
+                ${versions.map(v => `
+                  <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:13px">
+                    <div>
+                      <strong>v${v.version}</strong>
+                      <span style="color:var(--text-dim);margin-left:8px">${v.saved_by_name || 'Unknown'}</span>
+                      <span style="color:var(--text-dim);margin-left:8px">${timeAgo(v.created_at)}</span>
+                    </div>
+                    <div style="display:flex;gap:4px">
+                      <button class="btn btn-secondary btn-sm" data-view-version="${v.id}" style="font-size:11px">View</button>
+                      <button class="btn btn-secondary btn-sm" data-restore-version="${v.id}" data-ver="${v.version}" style="font-size:11px">Restore</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+              <div id="versionPreview" style="display:none;margin-top:8px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto" class="md-rendered"></div>
+            `;
+            $$('[data-view-version]').forEach(btn => btn.addEventListener('click', async () => {
+              try {
+                const vRes = await api(`/admin/projects/${projectId}/plan/versions/${btn.dataset.viewVersion}`);
+                const preview = $('#versionPreview');
+                preview.style.display = 'block';
+                preview.innerHTML = renderMarkdown(escapeHtml(vRes.data.version.content));
+              } catch (err) { alert(err.message); }
+            }));
+            $$('[data-restore-version]').forEach(btn => btn.addEventListener('click', async () => {
+              if (!confirm(`Restore to v${btn.dataset.ver}? Current plan will be saved as a new version.`)) return;
+              try {
+                await api(`/admin/projects/${projectId}/plan/restore/${btn.dataset.restoreVersion}`, { method: 'POST' });
+                renderProjectDetail(projectId);
+              } catch (err) { alert(err.message); }
+            }));
+          } catch (err) {
+            panel.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+          }
         });
       }
 

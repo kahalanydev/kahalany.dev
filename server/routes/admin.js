@@ -504,6 +504,10 @@ router.post('/projects/:projectId/plan', (req, res) => {
 
   const existing = db.prepare('SELECT * FROM project_plans WHERE project_id = ?').get(project.id);
   if (existing) {
+    // Archive current version before overwriting
+    db.prepare('INSERT INTO plan_versions (id, project_id, content, version, saved_by) VALUES (?, ?, ?, ?, ?)')
+      .run(generateId(), project.id, existing.content, existing.version, req.user.id);
+
     db.prepare("UPDATE project_plans SET content = ?, version = version + 1, updated_at = datetime('now') WHERE project_id = ?")
       .run(content, project.id);
   } else {
@@ -511,8 +515,61 @@ router.post('/projects/:projectId/plan', (req, res) => {
       .run(generateId(), project.id, content);
   }
 
-  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'plan_updated', entityType: 'plan', entityId: project.id, ip: req.ip });
-  res.json({ success: true, data: { message: 'Plan saved' } });
+  const plan = db.prepare('SELECT version FROM project_plans WHERE project_id = ?').get(project.id);
+  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'plan_updated', entityType: 'plan', entityId: project.id, details: { version: plan.version }, ip: req.ip });
+  res.json({ success: true, data: { message: 'Plan saved', version: plan.version } });
+});
+
+// GET /api/admin/projects/:projectId/plan/versions — plan version history
+router.get('/projects/:projectId/plan/versions', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const versions = db.prepare(`
+    SELECT pv.id, pv.version, pv.created_at, u.name as saved_by_name
+    FROM plan_versions pv
+    LEFT JOIN users u ON u.id = pv.saved_by
+    WHERE pv.project_id = ?
+    ORDER BY pv.version DESC
+  `).all(project.id);
+
+  res.json({ success: true, data: { versions } });
+});
+
+// GET /api/admin/projects/:projectId/plan/versions/:versionId — get specific version content
+router.get('/projects/:projectId/plan/versions/:versionId', (req, res) => {
+  const db = getDb();
+  const version = db.prepare('SELECT * FROM plan_versions WHERE id = ? AND project_id = ?')
+    .get(req.params.versionId, req.params.projectId);
+  if (!version) return res.status(404).json({ success: false, error: 'Version not found' });
+
+  res.json({ success: true, data: { version } });
+});
+
+// POST /api/admin/projects/:projectId/plan/restore/:versionId — restore a previous version
+router.post('/projects/:projectId/plan/restore/:versionId', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const oldVersion = db.prepare('SELECT * FROM plan_versions WHERE id = ? AND project_id = ?')
+    .get(req.params.versionId, req.params.projectId);
+  if (!oldVersion) return res.status(404).json({ success: false, error: 'Version not found' });
+
+  const current = db.prepare('SELECT * FROM project_plans WHERE project_id = ?').get(project.id);
+  if (current) {
+    // Archive current before restoring
+    db.prepare('INSERT INTO plan_versions (id, project_id, content, version, saved_by) VALUES (?, ?, ?, ?, ?)')
+      .run(generateId(), project.id, current.content, current.version, req.user.id);
+
+    db.prepare("UPDATE project_plans SET content = ?, version = version + 1, updated_at = datetime('now') WHERE project_id = ?")
+      .run(oldVersion.content, project.id);
+  }
+
+  const plan = db.prepare('SELECT version FROM project_plans WHERE project_id = ?').get(project.id);
+  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'plan_restored', entityType: 'plan', entityId: project.id, details: { restored_from: oldVersion.version, new_version: plan.version }, ip: req.ip });
+  res.json({ success: true, data: { message: `Restored to v${oldVersion.version}`, version: plan.version } });
 });
 
 // ===== TICKETS (admin view) =====
