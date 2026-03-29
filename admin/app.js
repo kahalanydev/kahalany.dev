@@ -341,10 +341,8 @@
     // Nav handlers
     $$('.sidebar-nav a').forEach(a => a.addEventListener('click', (e) => {
       e.preventDefault();
-      state.page = a.dataset.page;
       state.sidebarOpen = false;
-      window.location.hash = `/${state.page}`;
-      render();
+      window.location.hash = `/${a.dataset.page}`;
     }));
     $('#logoutBtn').addEventListener('click', logout);
     const toggle = $('#mobileToggle');
