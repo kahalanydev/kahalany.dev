@@ -26,8 +26,11 @@ app.use(helmet({
 // Compression
 app.use(compression());
 
-// Body parsing
-app.use(express.json({ limit: '1mb' }));
+// Body parsing (verify callback captures raw body for HMAC signature verification)
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, res, buf) => { req.rawBody = buf.toString(); }
+}));
 
 // Block access to sensitive paths
 app.use('/server', (req, res) => res.status(404).end());

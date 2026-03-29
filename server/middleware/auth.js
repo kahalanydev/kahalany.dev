@@ -78,26 +78,11 @@ function requireDevAuth(req, res, next) {
     return res.status(401).json({ success: false, error: 'Key expired' });
   }
 
-  // Verify HMAC signature
-  const bodyStr = JSON.stringify(req.body) || '';
+  // Verify HMAC signature (use raw body to match client-side hashing exactly)
+  const bodyStr = req.rawBody || '';
   const bodyHash = crypto.createHash('sha256').update(bodyStr).digest('hex');
   const payload = `${req.method}\n${req.originalUrl}\n${timestamp}\n${bodyHash}`;
   const expected = crypto.createHmac('sha256', key.secret).update(payload).digest('hex');
-
-  // DEBUG: log signature components (remove after diagnosing)
-  console.log('[DevAuth DEBUG]', JSON.stringify({
-    method: req.method,
-    originalUrl: req.originalUrl,
-    path: req.path,
-    baseUrl: req.baseUrl,
-    timestamp,
-    bodyStr,
-    bodyHash: bodyHash.slice(0, 12) + '...',
-    payload: payload.replace(/\n/g, '\\n'),
-    expected: expected.slice(0, 12) + '...',
-    received: signature.slice(0, 12) + '...',
-    match: expected === signature
-  }));
 
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) {
     return res.status(401).json({ success: false, error: 'Invalid signature' });
