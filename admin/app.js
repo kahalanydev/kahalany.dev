@@ -104,11 +104,11 @@
     scales: {
       x: {
         grid: { color: 'rgba(255,255,255,0.05)' },
-        ticks: { color: '#888', font: { size: 11 } }
+        ticks: { color: '#a1a1aa', font: { size: 11 } }
       },
       y: {
         grid: { color: 'rgba(255,255,255,0.05)' },
-        ticks: { color: '#888', font: { size: 11 } },
+        ticks: { color: '#a1a1aa', font: { size: 11 } },
         beginAtZero: true
       }
     }
@@ -127,7 +127,7 @@
         <div class="login-card">
           <div class="login-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
           <h2 class="login-title">Admin Login</h2>
-          <div id="loginError"></div>
+          <div id="loginMsg"></div>
           <form id="loginForm">
             <div class="form-group">
               <label>Email</label>
@@ -139,6 +139,17 @@
             </div>
             <button type="submit" class="btn btn-primary">Sign In</button>
           </form>
+          <div style="text-align:center;margin-top:16px">
+            <a href="#" id="forgotLink" style="color:var(--text-secondary);font-size:13px;text-decoration:underline">Forgot password?</a>
+          </div>
+          <div id="resetSection" style="display:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Enter your email to reset your password. The new password will appear in the server logs.</p>
+            <form id="resetForm" style="display:flex;gap:8px">
+              <input type="email" id="resetEmail" placeholder="Your admin email" required style="flex:1;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14px">
+              <button type="submit" class="btn btn-secondary" style="width:auto;white-space:nowrap">Reset</button>
+            </form>
+            <div id="resetMsg" style="margin-top:10px"></div>
+          </div>
         </div>
       </div>
     `;
@@ -150,10 +161,32 @@
       try {
         await login($('#loginEmail').value, $('#loginPassword').value);
       } catch (err) {
-        $('#loginError').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        $('#loginMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         btn.textContent = 'Sign In';
         btn.disabled = false;
       }
+    });
+    $('#forgotLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      const section = $('#resetSection');
+      section.style.display = section.style.display === 'none' ? 'block' : 'none';
+    });
+    $('#resetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('button[type="submit"]', e.target);
+      btn.textContent = 'Resetting...';
+      btn.disabled = true;
+      try {
+        const res = await api('/auth/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ email: $('#resetEmail').value })
+        });
+        $('#resetMsg').innerHTML = `<div class="alert alert-success">${escapeHtml(res.data.message)}</div>`;
+      } catch (err) {
+        $('#resetMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+      }
+      btn.textContent = 'Reset';
+      btn.disabled = false;
     });
   }
 
@@ -577,12 +610,12 @@
             labels: d.dailyVisitors.map(v => v.date.slice(5)),
             datasets: [{
               data: d.dailyVisitors.map(v => v.count),
-              borderColor: '#00ff88',
-              backgroundColor: 'rgba(0,255,136,0.1)',
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59,130,246,0.1)',
               fill: true,
               tension: 0.3,
               pointRadius: 3,
-              pointBackgroundColor: '#00ff88'
+              pointBackgroundColor: '#3b82f6'
             }]
           },
           options: chartDefaults
@@ -597,8 +630,8 @@
             labels: d.sectionEngagement.map(s => s.target || 'unknown'),
             datasets: [{
               data: d.sectionEngagement.map(s => s.views),
-              backgroundColor: 'rgba(0,255,136,0.3)',
-              borderColor: '#00ff88',
+              backgroundColor: 'rgba(59,130,246,0.3)',
+              borderColor: '#3b82f6',
               borderWidth: 1
             }]
           },
@@ -627,7 +660,7 @@
 
       // Devices doughnut
       if (d.devices.length > 0) {
-        const colors = ['#00ff88', '#3b82f6', '#ffa502', '#ff4757', '#a855f7'];
+        const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#22c55e'];
         charts.devices = new Chart($('#devicesChart'), {
           type: 'doughnut',
           data: {
@@ -642,7 +675,7 @@
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { position: 'right', labels: { color: '#888', font: { size: 12 } } }
+              legend: { position: 'right', labels: { color: '#a1a1aa', font: { size: 12 } } }
             }
           }
         });
@@ -706,7 +739,7 @@
                     <td>${escapeHtml(u.email)}</td>
                     <td>${escapeHtml(u.name || '-')}</td>
                     <td>${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
-                    <td>${u.id !== state.user.id ? `<button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Remove</button>` : '<span class="badge badge-blue">you</span>'}</td>
+                    <td>${u.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" data-reset-user="${u.id}" style="margin-right:4px">Reset PW</button><button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Remove</button>` : '<span class="badge badge-blue">you</span>'}</td>
                   </tr>`).join('')}
                 </tbody>
               </table>
@@ -764,6 +797,18 @@
           $('#newUserResult').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
       });
+
+      // Reset user password handlers
+      $$('[data-reset-user]').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Reset this user\'s password?')) return;
+        try {
+          const res = await api(`/auth/users/${btn.dataset.resetUser}/reset`, { method: 'POST' });
+          const tempPass = res.data.temporary_password;
+          $('#usersMsg').innerHTML = `<div class="alert alert-success">Password reset! New temp password: <strong style="font-family:var(--mono)">${escapeHtml(tempPass)}</strong><br><small>They must change it on next login.</small></div>`;
+        } catch (err) {
+          $('#usersMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      }));
 
       // Delete user handlers
       $$('[data-delete-user]').forEach(btn => btn.addEventListener('click', async () => {

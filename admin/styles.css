@@ -1,23 +1,25 @@
 /* Admin Panel Styles — kahalany.dev */
 :root {
-  --bg: #0a0a0a;
-  --surface: #111111;
-  --surface-2: #1a1a1a;
-  --surface-3: #222222;
-  --border: #2a2a2a;
-  --text: #ffffff;
-  --text-secondary: #888888;
-  --text-dim: #555555;
-  --accent: #00ff88;
-  --accent-dim: rgba(0, 255, 136, 0.1);
-  --accent-border: rgba(0, 255, 136, 0.3);
-  --danger: #ff4757;
-  --danger-dim: rgba(255, 71, 87, 0.1);
-  --warning: #ffa502;
-  --warning-dim: rgba(255, 165, 2, 0.1);
-  --info: #3b82f6;
-  --info-dim: rgba(59, 130, 246, 0.1);
-  --font: 'Inter', -apple-system, sans-serif;
+  --bg: #09090b;
+  --surface: #18181b;
+  --surface-2: #1c1c21;
+  --surface-3: #232329;
+  --border: #27272a;
+  --border-light: #3f3f46;
+  --text: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-dim: #71717a;
+  --accent: #3b82f6;
+  --accent-dim: rgba(59, 130, 246, 0.1);
+  --accent-border: rgba(59, 130, 246, 0.3);
+  --gradient: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.1);
+  --warning: #f59e0b;
+  --warning-dim: rgba(245, 158, 11, 0.1);
+  --success: #22c55e;
+  --success-dim: rgba(34, 197, 94, 0.1);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: 'JetBrains Mono', monospace;
   --radius: 8px;
   --radius-lg: 12px;
@@ -116,8 +118,8 @@ body {
 }
 
 .btn-primary {
-  background: var(--accent);
-  color: #000;
+  background: var(--gradient);
+  color: white;
   width: 100%;
 }
 
@@ -155,9 +157,9 @@ body {
 }
 
 .alert-success {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border: 1px solid var(--accent-border);
+  background: var(--success-dim);
+  color: var(--success);
+  border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
 .alert-warning {
@@ -394,7 +396,7 @@ table td .mono {
   letter-spacing: 0.3px;
 }
 
-.badge-green { background: var(--accent-dim); color: var(--accent); }
+.badge-green { background: var(--success-dim); color: var(--success); }
 .badge-red { background: var(--danger-dim); color: var(--danger); }
 .badge-yellow { background: var(--warning-dim); color: var(--warning); }
 .badge-blue { background: var(--info-dim); color: var(--info); }

@@ -65,6 +65,56 @@ router.post('/change-password', requireAuth, (req, res) => {
   res.json({ success: true, data: { message: 'Password changed successfully' } });
 });
 
+// POST /api/auth/reset-password — self-service reset (prints new password to server logs)
+router.post('/reset-password', (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email is required' });
+  }
+
+  const db = getDb();
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  if (!user) {
+    // Don't reveal whether the email exists
+    return res.json({ success: true, data: { message: 'If that email exists, the password has been reset. Check the server logs.' } });
+  }
+
+  const password = crypto.randomBytes(12).toString('base64url');
+  const hash = bcrypt.hashSync(password, 12);
+
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1, updated_at = datetime(\'now\') WHERE id = ?')
+    .run(hash, user.id);
+
+  console.log('\n========================================');
+  console.log('  PASSWORD RESET');
+  console.log('========================================');
+  console.log(`  Email:        ${user.email}`);
+  console.log(`  New Password: ${password}`);
+  console.log('');
+  console.log('  Must change on next login.');
+  console.log('========================================\n');
+
+  res.json({ success: true, data: { message: 'If that email exists, the password has been reset. Check the server logs.' } });
+});
+
+// POST /api/auth/users/:id/reset — admin resets another user's password
+router.post('/users/:id/reset', requireAuth, (req, res) => {
+  const db = getDb();
+  const targetId = parseInt(req.params.id);
+  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(targetId);
+  if (!target) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  const password = crypto.randomBytes(12).toString('base64url');
+  const hash = bcrypt.hashSync(password, 12);
+
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1, updated_at = datetime(\'now\') WHERE id = ?')
+    .run(hash, targetId);
+
+  res.json({ success: true, data: { temporary_password: password } });
+});
+
 // GET /api/auth/users — list admins
 router.get('/users', requireAuth, (req, res) => {
   const db = getDb();
