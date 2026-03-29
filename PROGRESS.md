@@ -399,6 +399,48 @@ Generates project-specific `CLAUDE.md` with:
 
 ---
 
+## 2026-03-29 — File Uploads & Attachment UI (Phase 4)
+
+### File Upload System
+- Installed `multer` for multipart file handling
+- `server/routes/uploads.js` — full CRUD file upload API (~200 lines)
+  - **POST /api/uploads/tickets/:ticketId** — upload files with org-scope verification
+  - **GET /api/uploads/tickets/:ticketId** — list attachments with uploader name
+  - **GET /api/uploads/download/:attachmentId** — auth-gated download with Content-Disposition
+  - **DELETE /api/uploads/:attachmentId** — admin/staff or uploader can delete
+
+### Security
+- UUID-based stored filenames (prevents path traversal while keeping original name in DB)
+- MIME whitelist: images, PDFs, Office docs, text, CSV, ZIP
+- Extension blacklist: executables, scripts, DLLs (defense-in-depth)
+- 10MB per file limit, 10 files per ticket limit
+- Downloads forced via `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff`
+- Auth-gated downloads (JWT required via fetch + blob URL)
+
+### Attachment UI
+- **Admin ticket detail**: Attachments card with file list (icon, name, size, uploader, date), drag-and-drop upload zone, download via authenticated fetch, delete with confirmation
+- **Portal ticket detail**: Same attachment card (hidden upload zone when ticket is closed), clients can only delete their own uploads
+- File type icons based on MIME type (images, PDFs, docs, spreadsheets, archives, generic)
+- `formatFileSize()` helper added to both admin and portal apps
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `server/routes/uploads.js` | File upload/download/delete API |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/index.js` | Added upload routes |
+| `admin/app.js` | Attachment section in ticket detail, formatFileSize helper |
+| `portal/app.js` | Attachment section in ticket detail, formatFileSize helper |
+| `package.json` | Added multer dependency |
+
+### Remaining Phases
+- **Phase 5**: PCG Pilot (real client onboarding)
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [ ] Add more contact methods (phone, WhatsApp, Calendly)

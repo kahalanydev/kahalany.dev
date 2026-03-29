@@ -9,6 +9,7 @@ const trackRoutes = require('./routes/track');
 const adminRoutes = require('./routes/admin');
 const portalRoutes = require('./routes/portal');
 const devRoutes = require('./routes/dev');
+const uploadRoutes = require('./routes/uploads');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -42,6 +43,7 @@ app.use('/api/track', trackRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/portal', portalRoutes);
 app.use('/api/dev', devRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Serve admin panel
 app.use('/admin', express.static(path.join(__dirname, '..', 'admin'), {

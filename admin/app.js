@@ -94,6 +94,12 @@
     return `<span class="badge ${map[severity] || 'badge-gray'}">${severity}</span>`;
   }
 
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
   // ===== MARKDOWN RENDERER =====
   function renderMarkdown(text) {
     if (!text) return '';
@@ -1351,8 +1357,25 @@
       const res = await api(`/admin/tickets/${ticketId}`);
       const { ticket, comments } = res.data;
 
+      // Fetch attachments
+      let attachments = [];
+      try {
+        const attRes = await fetch(`/api/uploads/tickets/${ticket.id}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` } });
+        const attData = await attRes.json();
+        if (attData.success) attachments = attData.data.attachments;
+      } catch {}
+
       const statusOpts = ['open', 'in_progress', 'review', 'completed', 'closed'];
       const priorityOpts = ['low', 'medium', 'high', 'urgent'];
+
+      const fileIcon = (mime) => {
+        if (mime.startsWith('image/')) return '\u{1F5BC}';
+        if (mime.includes('pdf')) return '\u{1F4C4}';
+        if (mime.includes('word') || mime.includes('document')) return '\u{1F4DD}';
+        if (mime.includes('sheet') || mime.includes('excel')) return '\u{1F4CA}';
+        if (mime.includes('zip')) return '\u{1F4E6}';
+        return '\u{1F4CE}';
+      };
 
       $('#mainContent').innerHTML = `
         <div style="margin-bottom:16px">
@@ -1377,6 +1400,39 @@
         <div id="ticketUpdateMsg"></div>
 
         ${ticket.description ? `<div style="padding:16px;background:var(--surface-2);border-radius:var(--radius);font-size:14px;line-height:1.6;color:var(--text-secondary);margin-bottom:24px;white-space:pre-wrap">${escapeHtml(ticket.description)}</div>` : ''}
+
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-header">
+            <span class="card-title">Attachments (${attachments.length}/10)</span>
+          </div>
+          <div id="attachmentsList">
+            ${attachments.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;margin:0">No files attached.</p>' : `
+              <div style="display:flex;flex-direction:column;gap:6px">
+                ${attachments.map(a => `
+                  <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface-2);border-radius:var(--radius);font-size:13px" data-att-id="${a.id}">
+                    <span style="font-size:18px">${fileIcon(a.mimetype)}</span>
+                    <a href="#" class="att-download" data-id="${a.id}" data-name="${escapeHtml(a.filename)}" style="color:var(--accent);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(a.filename)}">${escapeHtml(a.filename)}</a>
+                    <span style="color:var(--text-dim);font-size:12px;white-space:nowrap">${formatFileSize(a.size)}</span>
+                    <span style="color:var(--text-dim);font-size:12px;white-space:nowrap">${escapeHtml(a.uploaded_by_name || '')}</span>
+                    <span style="color:var(--text-dim);font-size:12px;white-space:nowrap">${timeAgo(a.uploaded_at)}</span>
+                    <button class="btn btn-secondary btn-sm att-delete" data-id="${a.id}" style="padding:2px 8px;font-size:11px;color:var(--danger);border-color:var(--danger)">\u2715</button>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+          ${attachments.length < 10 ? `
+            <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+              <div id="uploadDropZone" style="border:2px dashed var(--border);border-radius:var(--radius);padding:20px;text-align:center;cursor:pointer;transition:border-color 0.2s">
+                <div style="color:var(--text-secondary);font-size:13px">Drop files here or <label for="fileInput" style="color:var(--accent);cursor:pointer;text-decoration:underline">browse</label></div>
+                <div style="color:var(--text-dim);font-size:11px;margin-top:4px">Max 10MB per file. Images, PDFs, docs, spreadsheets, CSV, ZIP.</div>
+                <input type="file" id="fileInput" multiple style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip">
+              </div>
+              <div id="uploadProgress" style="margin-top:8px"></div>
+              <div id="uploadMsg" style="margin-top:8px"></div>
+            </div>
+          ` : ''}
+        </div>
 
         <div class="card">
           <div class="card-header"><span class="card-title">Comments (${comments.length})</span></div>
@@ -1413,6 +1469,78 @@
       };
       $('#ticketStatus').addEventListener('change', (e) => updateTicket('status', e.target.value));
       $('#ticketPriority').addEventListener('change', (e) => updateTicket('priority', e.target.value));
+
+      // File upload handling
+      const uploadFiles = async (files) => {
+        if (!files || files.length === 0) return;
+        const formData = new FormData();
+        for (const f of files) formData.append('files', f);
+        const progressEl = $('#uploadProgress');
+        const msgEl = $('#uploadMsg');
+        if (progressEl) progressEl.innerHTML = '<div style="color:var(--text-secondary);font-size:13px">Uploading...</div>';
+        if (msgEl) msgEl.innerHTML = '';
+        try {
+          const uploadRes = await fetch(`/api/uploads/tickets/${ticket.id}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` },
+            body: formData
+          });
+          const uploadData = await uploadRes.json();
+          if (!uploadData.success) throw new Error(uploadData.error);
+          renderAdminTicketDetail(ticketId);
+        } catch (err) {
+          if (progressEl) progressEl.innerHTML = '';
+          if (msgEl) msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      };
+
+      const dropZone = $('#uploadDropZone');
+      const fileInput = $('#fileInput');
+      if (dropZone) {
+        dropZone.addEventListener('click', () => fileInput && fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--accent)'; });
+        dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = 'var(--border)'; });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; uploadFiles(e.dataTransfer.files); });
+      }
+      if (fileInput) {
+        fileInput.addEventListener('change', () => { uploadFiles(fileInput.files); });
+      }
+
+      // Download attachment (auth-gated)
+      $$('.att-download').forEach(link => {
+        link.addEventListener('click', async (e) => {
+          e.preventDefault();
+          try {
+            const dlRes = await fetch(`/api/uploads/download/${link.dataset.id}`, {
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` }
+            });
+            if (!dlRes.ok) throw new Error('Download failed');
+            const blob = await dlRes.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = link.dataset.name; a.click();
+            URL.revokeObjectURL(url);
+          } catch (err) { alert('Download failed: ' + err.message); }
+        });
+      });
+
+      // Delete attachment
+      $$('.att-delete').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this attachment?')) return;
+          try {
+            const delRes = await fetch(`/api/uploads/${btn.dataset.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` }
+            });
+            const delData = await delRes.json();
+            if (!delData.success) throw new Error(delData.error);
+            renderAdminTicketDetail(ticketId);
+          } catch (err) {
+            alert('Delete failed: ' + err.message);
+          }
+        });
+      });
 
       // Post comment
       const postComment = async (isInternal) => {
