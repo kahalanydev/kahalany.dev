@@ -775,14 +775,16 @@
     `);
 
     try {
-      const [usersRes, oauthRes, smtpRes] = await Promise.all([
+      const [usersRes, oauthRes, smtpRes, devKeysRes] = await Promise.all([
         api('/auth/users'),
         api('/auth/oauth/config'),
-        api('/auth/smtp/config')
+        api('/auth/smtp/config'),
+        api('/admin/dev-keys')
       ]);
       const users = usersRes.data.users;
       const oauth = oauthRes.data;
       const smtp = smtpRes.data;
+      const devKeys = devKeysRes.data.keys;
 
       $('#mainContent').innerHTML = `
         <div class="page-header">
@@ -903,6 +905,52 @@
               <button type="button" class="btn btn-secondary" id="smtpTestBtn" style="width:auto">Send Test Email</button>
             </div>
           </form>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
+            <span class="card-title">Dev Keys</span>
+          </div>
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+            HMAC API keys for Claude Code integration. Use these to connect the portal sync service.
+          </p>
+          <div id="devKeysMsg"></div>
+          ${devKeys.length ? `
+          <div class="table-wrap" style="margin-bottom:20px">
+            <table>
+              <thead><tr><th>Key ID</th><th>Label</th><th>Status</th><th>Last Used</th><th>Created</th><th></th></tr></thead>
+              <tbody>
+                ${devKeys.map(k => `<tr>
+                  <td><code style="font-family:var(--mono);font-size:12px">${escapeHtml(k.key_id)}</code></td>
+                  <td>${escapeHtml(k.label || '-')}</td>
+                  <td>${k.revoked ? '<span class="badge badge-red">revoked</span>' : (k.expires_at && new Date(k.expires_at) < new Date() ? '<span class="badge badge-yellow">expired</span>' : '<span class="badge badge-green">active</span>')}</td>
+                  <td>${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'never'}</td>
+                  <td>${new Date(k.created_at).toLocaleDateString()}</td>
+                  <td>${!k.revoked ? `<button class="btn btn-danger btn-sm" data-revoke-key="${escapeHtml(k.key_id)}">Revoke</button>` : ''}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : '<p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">No dev keys yet.</p>'}
+          <div style="border-top:1px solid var(--border);padding-top:20px">
+            <h4 style="font-size:14px;margin-bottom:12px">Create New Key</h4>
+            <form id="createDevKeyForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+              <div style="flex:1;min-width:200px">
+                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Label</label>
+                <input type="text" id="devKeyLabel" placeholder="e.g. Claude Code Desktop" style="width:100%;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+              </div>
+              <div style="min-width:120px">
+                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Expires</label>
+                <select id="devKeyExpiry" style="width:100%;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+                  <option value="">Never</option>
+                  <option value="30">30 days</option>
+                  <option value="90" selected>90 days</option>
+                  <option value="365">1 year</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:auto">Generate Key</button>
+            </form>
+            <div id="devKeyResult" style="margin-top:12px"></div>
+          </div>
         </div>
       `;
 
@@ -1033,6 +1081,40 @@
           $('#smtpMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
       });
+
+      // Create dev key
+      $('#createDevKeyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const body = { label: $('#devKeyLabel').value || undefined };
+          const expiry = $('#devKeyExpiry').value;
+          if (expiry) body.expires_days = parseInt(expiry);
+          const res = await api('/admin/dev-keys', { method: 'POST', body: JSON.stringify(body) });
+          const d = res.data;
+          $('#devKeyResult').innerHTML = `
+            <div class="alert alert-success" style="word-break:break-all">
+              Key created! Copy these now — the secret will not be shown again.<br><br>
+              <strong>Key ID:</strong> <code style="font-family:var(--mono)">${escapeHtml(d.key_id)}</code><br>
+              <strong>Secret:</strong> <code style="font-family:var(--mono)">${escapeHtml(d.secret)}</code>
+            </div>
+          `;
+          e.target.reset();
+          setTimeout(() => renderSettings(), 5000);
+        } catch (err) {
+          $('#devKeyResult').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      });
+
+      // Revoke dev key
+      $$('[data-revoke-key]').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Revoke this dev key? Any services using it will stop working.')) return;
+        try {
+          await api(`/admin/dev-keys/${btn.dataset.revokeKey}`, { method: 'DELETE' });
+          renderSettings();
+        } catch (err) {
+          $('#devKeysMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      }));
     } catch (err) {
       $('#mainContent').innerHTML = `<div class="alert alert-error">Failed to load settings: ${escapeHtml(err.message)}</div>`;
     }
