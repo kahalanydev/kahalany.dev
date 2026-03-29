@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDb, generateId, logActivity, nextTicketNumber } = require('../db');
 const { requireAuth, requireRole, enforceOrgScope, rateLimit } = require('../middleware/auth');
+const { sendTicketNotification } = require('../utils/email');
 
 const router = express.Router();
 
@@ -190,6 +191,39 @@ router.post('/projects/:projectId/tickets', enforceOrgScope, (req, res) => {
     details: { ticket_number: ticketNum, title: title.trim(), type: ticketType }, ip: req.ip });
 
   res.json({ success: true, data: { ticket: { id, ticket_number: ticketNum, title: title.trim(), type: ticketType, priority: ticketPriority, status: 'open' } } });
+
+  // Fire notifications asynchronously (don't block response)
+  const createdBy = req.user.name || req.user.email;
+  const projectName = req.project.name;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const ticketUrl = `${proto}://${host}/admin#/tickets/${id}`;
+
+  // Email all admins
+  const admins = db.prepare("SELECT email FROM users WHERE role IN ('admin', 'staff')").all();
+  if (admins.length) {
+    sendTicketNotification({
+      adminEmails: admins.map(a => a.email),
+      projectName, ticketNumber: ticketNum, title: title.trim(),
+      type: ticketType, priority: ticketPriority, createdBy, ticketUrl
+    }).catch(err => console.error('[NOTIFY] Email error:', err.message));
+  }
+
+  // Fire webhook if configured
+  const webhookUrl = db.prepare("SELECT value FROM config WHERE key = 'ticket_webhook_url'").get();
+  if (webhookUrl && webhookUrl.value) {
+    fetch(webhookUrl.value, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'ticket.created',
+        project: projectName,
+        ticket: { id, number: ticketNum, title: title.trim(), type: ticketType, priority: ticketPriority, status: 'open' },
+        created_by: createdBy,
+        url: ticketUrl
+      })
+    }).catch(err => console.error('[WEBHOOK] Error:', err.message));
+  }
 });
 
 // GET /api/portal/projects/:projectId/tickets/:ticketId

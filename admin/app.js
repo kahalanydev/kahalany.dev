@@ -876,9 +876,9 @@
         </div>
 
         <div class="card" style="margin-top:20px">
-          <div class="card-header"><span class="card-title">Email (SMTP)</span></div>
+          <div class="card-header"><span class="card-title">Notifications</span></div>
           <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
-            Configure SMTP to send welcome emails with login credentials when creating users. Without this, passwords are only shown on screen.
+            Configure email (SMTP) for invites and ticket alerts, and an optional webhook for ticket events.
           </p>
           <div id="smtpMsg"></div>
           <form id="smtpForm">
@@ -909,6 +909,15 @@
               <button type="button" class="btn btn-secondary" id="smtpTestBtn" style="width:auto">Send Test Email</button>
             </div>
           </form>
+          <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:20px">
+            <h4 style="font-size:14px;margin-bottom:8px">Ticket Webhook</h4>
+            <p style="color:var(--text-dim);font-size:12px;margin-bottom:12px">POST a JSON payload to this URL when a client creates a ticket. Works with Slack, Discord, or custom endpoints.</p>
+            <form id="webhookForm" style="display:flex;gap:8px">
+              <input type="url" id="webhookUrl" value="${escapeHtml(smtp.ticket_webhook_url)}" placeholder="https://hooks.slack.com/services/..." style="flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:12px">
+              <button type="submit" class="btn btn-primary" style="width:auto">Save</button>
+            </form>
+            <div id="webhookMsg" style="margin-top:8px"></div>
+          </div>
         </div>
 
         <div class="card" style="margin-top:20px">
@@ -1083,6 +1092,16 @@
         } catch (err) {
           $('#smtpMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
+      });
+
+      // Webhook form
+      $('#webhookForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          await api('/auth/smtp/config', { method: 'PUT', body: JSON.stringify({ ticket_webhook_url: $('#webhookUrl').value }) });
+          $('#webhookMsg').innerHTML = '<div class="alert alert-success">Webhook URL saved</div>';
+          setTimeout(() => { const m = $('#webhookMsg'); if (m) m.innerHTML = ''; }, 3000);
+        } catch (err) { $('#webhookMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
       });
 
       // Create dev key

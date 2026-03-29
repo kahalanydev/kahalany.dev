@@ -239,7 +239,8 @@ router.get('/smtp/config', requireAuth, requireRole('admin'), (req, res) => {
     smtp_port: get('smtp_port') || '587',
     smtp_user: get('smtp_user'),
     smtp_pass_set: !!get('smtp_pass'),
-    smtp_from: get('smtp_from')
+    smtp_from: get('smtp_from'),
+    ticket_webhook_url: get('ticket_webhook_url')
   }});
 });
 
@@ -257,6 +258,11 @@ router.put('/smtp/config', requireAuth, requireRole('admin'), (req, res) => {
     const existing = db.prepare("SELECT value FROM config WHERE key = 'smtp_pass'").get();
     if (existing) db.prepare("UPDATE config SET value = ? WHERE key = 'smtp_pass'").run(req.body.smtp_pass);
     else db.prepare("INSERT INTO config (key, value) VALUES ('smtp_pass', ?)").run(req.body.smtp_pass);
+  }
+  if (req.body.ticket_webhook_url !== undefined) {
+    const existing = db.prepare("SELECT value FROM config WHERE key = 'ticket_webhook_url'").get();
+    if (existing) db.prepare("UPDATE config SET value = ? WHERE key = 'ticket_webhook_url'").run(req.body.ticket_webhook_url);
+    else db.prepare("INSERT INTO config (key, value) VALUES ('ticket_webhook_url', ?)").run(req.body.ticket_webhook_url);
   }
   res.json({ success: true, data: { message: 'SMTP settings saved' } });
 });

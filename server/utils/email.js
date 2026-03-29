@@ -100,4 +100,30 @@ function sendPasswordResetEmail({ email, name, inviteUrl }) {
   });
 }
 
-module.exports = { sendEmail, sendWelcomeEmail, sendPasswordResetEmail, getSmtpConfig };
+function sendTicketNotification({ adminEmails, projectName, ticketNumber, title, type, priority, createdBy, ticketUrl }) {
+  const priorityColors = { low: '#71717a', medium: '#3b82f6', high: '#f59e0b', urgent: '#ef4444' };
+  const priorityColor = priorityColors[priority] || '#3b82f6';
+
+  const promises = adminEmails.map(email => sendEmail({
+    to: email,
+    subject: `[${projectName}] New ticket #${ticketNumber}: ${title}`,
+    html: emailWrapper(`
+      <p style="color:#a1a1aa;font-size:13px;text-align:center;margin:-16px 0 24px">New Ticket</p>
+      <p style="margin-bottom:20px"><strong style="color:#fff">${createdBy}</strong> opened a new ticket in <strong style="color:#fff">${projectName}</strong>:</p>
+      <div style="background:#18181b;border:1px solid #232329;border-radius:8px;padding:16px;margin-bottom:20px">
+        <div style="font-size:16px;font-weight:600;color:#fff;margin-bottom:8px">#${ticketNumber} — ${title}</div>
+        <div style="display:flex;gap:12px;font-size:12px">
+          <span style="color:#a1a1aa">Type: <span style="color:#e4e4e7">${type}</span></span>
+          <span style="color:#a1a1aa">Priority: <span style="color:${priorityColor};font-weight:600">${priority.toUpperCase()}</span></span>
+        </div>
+      </div>
+      <div style="text-align:center;margin:24px 0">
+        <a href="${ticketUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">View Ticket</a>
+      </div>
+    `)
+  }));
+
+  return Promise.allSettled(promises);
+}
+
+module.exports = { sendEmail, sendWelcomeEmail, sendPasswordResetEmail, sendTicketNotification, getSmtpConfig, emailWrapper };
