@@ -383,6 +383,8 @@ function initSchema() {
   safeAlter('ALTER TABLE users ADD COLUMN last_login_at TEXT');
   safeAlter('ALTER TABLE users ADD COLUMN google_id TEXT');
   safeAlter('ALTER TABLE users ADD COLUMN avatar_url TEXT');
+  safeAlter('ALTER TABLE users ADD COLUMN invite_token TEXT');
+  safeAlter('ALTER TABLE users ADD COLUMN invite_expires_at TEXT');
   safeAlter('ALTER TABLE projects ADD COLUMN scaffolded_at TEXT');
 
   // Plan version history

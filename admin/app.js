@@ -981,11 +981,11 @@
             method: 'POST',
             body: JSON.stringify({ email: $('#newUserEmail').value, name: $('#newUserName').value || undefined })
           });
-          const tempPass = res.data.temporary_password;
           $('#newUserResult').innerHTML = `
             <div class="alert alert-success">
-              Admin created! Temporary password: <strong style="font-family:var(--mono)">${escapeHtml(tempPass)}</strong><br>
-              <small>Share this securely — they must change it on first login.</small>
+              Admin created! Invite link sent via email.<br>
+              <small>You can also share this link directly:</small><br>
+              <input type="text" value="${escapeHtml(res.data.invite_url)}" readonly onclick="this.select()" style="width:100%;margin-top:8px;padding:8px;font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
             </div>
           `;
           e.target.reset();
@@ -1000,8 +1000,7 @@
         if (!confirm('Reset this user\'s password?')) return;
         try {
           const res = await api(`/auth/users/${btn.dataset.resetUser}/reset`, { method: 'POST' });
-          const tempPass = res.data.temporary_password;
-          $('#usersMsg').innerHTML = `<div class="alert alert-success">Password reset! New temp password: <strong style="font-family:var(--mono)">${escapeHtml(tempPass)}</strong><br><small>They must change it on next login.</small></div>`;
+          $('#usersMsg').innerHTML = `<div class="alert alert-success">Password reset! Invite link sent via email.<br><small>Or share directly:</small><br><input type="text" value="${escapeHtml(res.data.invite_url)}" readonly onclick="this.select()" style="width:100%;margin-top:8px;padding:8px;font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)"></div>`;
         } catch (err) {
           $('#usersMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
@@ -1907,7 +1906,7 @@
           const res = await api(`/admin/clients/${orgId}/users`, { method: 'POST', body: JSON.stringify({ email, name }) });
           result.innerHTML = res.data.linked
             ? `<div class="alert alert-success">${escapeHtml(res.data.message)}</div>`
-            : `<div class="alert alert-success">Created! Temp password: <strong style="font-family:var(--mono)">${escapeHtml(res.data.temporary_password)}</strong><br><small>Share securely — must change on first login.</small></div>`;
+            : `<div class="alert alert-success">Created! Invite link sent via email.<br><small>Or share directly:</small><br><input type="text" value="${escapeHtml(res.data.invite_url)}" readonly onclick="this.select()" style="width:100%;margin-top:8px;padding:8px;font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)"></div>`;
           setTimeout(() => renderClients(), 3000);
         } catch (err) { result.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
       }));
@@ -1936,9 +1935,80 @@
     }
   }
 
+  // ===== RENDER: INVITE =====
+  async function renderInvite(token) {
+    app.innerHTML = `
+      <div class="login-page">
+        <div class="login-card">
+          <div class="login-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
+          <h2 class="login-title">Set Up Your Password</h2>
+          <div id="inviteMsg"><div class="loading"><div class="spinner"></div> Validating invite...</div></div>
+          <form id="inviteForm" style="display:none">
+            <div id="inviteInfo"></div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" id="invitePass" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+              <label>Confirm Password</label>
+              <input type="password" id="invitePassConfirm" placeholder="Confirm password" required minlength="8" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-primary">Set Password & Sign In</button>
+          </form>
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await fetch('/api/auth/invite/' + token).then(r => r.json());
+      if (!res.success) throw new Error(res.error);
+      const user = res.data.user;
+      $('#inviteMsg').innerHTML = '';
+      $('#inviteInfo').innerHTML = `<p style="color:var(--text-secondary);font-size:14px;margin-bottom:16px">Welcome${user.name ? ', <strong>' + escapeHtml(user.name) + '</strong>' : ''}! Set your password to get started.</p>`;
+      $('#inviteForm').style.display = 'block';
+      $('#invitePass').focus();
+    } catch (err) {
+      $('#inviteMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div><p style="margin-top:16px"><a href="#/login" style="color:var(--accent)">Go to login</a></p>`;
+      return;
+    }
+
+    $('#inviteForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pass = $('#invitePass').value;
+      const confirm = $('#invitePassConfirm').value;
+      if (pass !== confirm) {
+        $('#inviteMsg').innerHTML = '<div class="alert alert-error">Passwords do not match</div>';
+        return;
+      }
+      const btn = $('button[type="submit"]', e.target);
+      btn.textContent = 'Setting up...'; btn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/invite/' + token + '/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass })
+        }).then(r => r.json());
+        if (!res.success) throw new Error(res.error);
+        state.token = res.data.token;
+        state.user = res.data.user;
+        localStorage.setItem('admin_token', state.token);
+        window.location.hash = '#/dashboard';
+        render();
+      } catch (err) {
+        $('#inviteMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        btn.textContent = 'Set Password & Sign In'; btn.disabled = false;
+      }
+    });
+  }
+
   // ===== MAIN RENDER =====
   async function render() {
     destroyCharts();
+
+    // Handle invite page before auth check (public route)
+    const hash = window.location.hash.replace('#/', '') || '';
+    const parts = hash.split('/');
+    if (parts[0] === 'invite' && parts[1]) return renderInvite(parts[1]);
 
     if (!state.token || !state.user) {
       const authed = await checkAuth();

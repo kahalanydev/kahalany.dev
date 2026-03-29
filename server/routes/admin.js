@@ -297,20 +297,23 @@ router.post('/clients/:orgId/users', (req, res) => {
     return res.json({ success: true, data: { user: { id: existing.id, email, name }, linked: true, message: `Existing ${existing.role} user linked to ${org.name}` } });
   }
 
-  const password = crypto.randomBytes(12).toString('base64url');
-  const hash = bcrypt.hashSync(password, 12);
+  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  const placeholder = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 4); // unusable password
+
   const result = db.prepare(
-    'INSERT INTO users (email, password_hash, name, role, org_id, must_change_password) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(email.toLowerCase().trim(), hash, name || null, 'client', org.id, 1);
+    'INSERT INTO users (email, password_hash, name, role, org_id, must_change_password, invite_token, invite_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(email.toLowerCase().trim(), placeholder, name || null, 'client', org.id, 1, inviteToken, inviteExpires);
 
   logActivity(db, { userId: req.user.id, action: 'client_user_created', entityType: 'user', entityId: String(result.lastInsertRowid),
     details: { email, org_name: org.name }, ip: req.ip });
 
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
-  sendWelcomeEmail({ email: email.toLowerCase().trim(), name, password, role: 'client', loginUrl: `${proto}://${host}/portal` });
+  const inviteUrl = `${proto}://${host}/portal#/invite/${inviteToken}`;
+  sendWelcomeEmail({ email: email.toLowerCase().trim(), name, role: 'client', inviteUrl });
 
-  res.json({ success: true, data: { user: { id: result.lastInsertRowid, email, name }, temporary_password: password } });
+  res.json({ success: true, data: { user: { id: result.lastInsertRowid, email, name }, invite_url: inviteUrl } });
 });
 
 // GET /api/admin/clients/:orgId/users — list client users for org

@@ -98,6 +98,52 @@ router.post('/reset-password', (req, res) => {
   res.json({ success: true, data: { message: 'If that email exists, the password has been reset. Check the server logs.' } });
 });
 
+// GET /api/auth/invite/:token — validate invite token (public)
+router.get('/invite/:token', (req, res) => {
+  const db = getDb();
+  const user = db.prepare('SELECT id, email, name, role FROM users WHERE invite_token = ?').get(req.params.token);
+  if (!user) return res.status(404).json({ success: false, error: 'Invalid or expired invite link' });
+
+  const row = db.prepare('SELECT invite_expires_at FROM users WHERE id = ?').get(user.id);
+  if (row.invite_expires_at && new Date(row.invite_expires_at) < new Date()) {
+    return res.status(410).json({ success: false, error: 'This invite link has expired. Please ask your admin to resend it.' });
+  }
+
+  res.json({ success: true, data: { user: { email: user.email, name: user.name } } });
+});
+
+// POST /api/auth/invite/:token/accept — set password via invite (public)
+router.post('/invite/:token/accept', (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 8) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
+  }
+
+  const db = getDb();
+  const user = db.prepare('SELECT * FROM users WHERE invite_token = ?').get(req.params.token);
+  if (!user) return res.status(404).json({ success: false, error: 'Invalid or expired invite link' });
+
+  if (user.invite_expires_at && new Date(user.invite_expires_at) < new Date()) {
+    return res.status(410).json({ success: false, error: 'This invite link has expired. Please ask your admin to resend it.' });
+  }
+
+  const hash = bcrypt.hashSync(password, 12);
+  db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0, invite_token = NULL, invite_expires_at = NULL, updated_at = datetime('now') WHERE id = ?")
+    .run(hash, user.id);
+
+  // Auto-login after accepting invite
+  const token = jwt.sign({ userId: user.id }, getJwtSecret(), { expiresIn: '24h' });
+
+  res.json({
+    success: true,
+    data: {
+      message: 'Password set successfully',
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role }
+    }
+  });
+});
+
 // POST /api/auth/users/:id/reset — admin resets another user's password
 router.post('/users/:id/reset', requireAuth, (req, res) => {
   const db = getDb();
@@ -107,18 +153,20 @@ router.post('/users/:id/reset', requireAuth, (req, res) => {
     return res.status(404).json({ success: false, error: 'User not found' });
   }
 
-  const password = crypto.randomBytes(12).toString('base64url');
-  const hash = bcrypt.hashSync(password, 12);
+  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const placeholder = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 4);
 
-  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1, updated_at = datetime(\'now\') WHERE id = ?')
-    .run(hash, targetId);
+  db.prepare("UPDATE users SET password_hash = ?, must_change_password = 1, invite_token = ?, invite_expires_at = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(placeholder, inviteToken, inviteExpires, targetId);
 
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
-  const loginUrl = target.role === 'client' ? `${proto}://${host}/portal` : `${proto}://${host}/admin`;
-  sendPasswordResetEmail({ email: target.email, name: target.name, password, loginUrl });
+  const portalPath = target.role === 'client' ? 'portal' : 'admin';
+  const inviteUrl = `${proto}://${host}/${portalPath}#/invite/${inviteToken}`;
+  sendPasswordResetEmail({ email: target.email, name: target.name, inviteUrl });
 
-  res.json({ success: true, data: { temporary_password: password } });
+  res.json({ success: true, data: { invite_url: inviteUrl } });
 });
 
 // GET /api/auth/users — list admins
@@ -141,22 +189,24 @@ router.post('/users', requireAuth, (req, res) => {
     return res.status(409).json({ success: false, error: 'User with this email already exists' });
   }
 
-  const password = crypto.randomBytes(12).toString('base64url');
-  const hash = bcrypt.hashSync(password, 12);
+  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const placeholder = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 4);
 
   const result = db.prepare(
-    'INSERT INTO users (email, password_hash, name, role, must_change_password) VALUES (?, ?, ?, ?, ?)'
-  ).run(email.toLowerCase().trim(), hash, name || null, 'admin', 1);
+    'INSERT INTO users (email, password_hash, name, role, must_change_password, invite_token, invite_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(email.toLowerCase().trim(), placeholder, name || null, 'admin', 1, inviteToken, inviteExpires);
 
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
-  sendWelcomeEmail({ email: email.toLowerCase().trim(), name, password, role: 'admin', loginUrl: `${proto}://${host}/admin` });
+  const inviteUrl = `${proto}://${host}/admin#/invite/${inviteToken}`;
+  sendWelcomeEmail({ email: email.toLowerCase().trim(), name, role: 'admin', inviteUrl });
 
   res.json({
     success: true,
     data: {
       user: { id: result.lastInsertRowid, email: email.toLowerCase().trim(), name },
-      temporary_password: password
+      invite_url: inviteUrl
     }
   });
 });
@@ -216,7 +266,7 @@ router.post('/smtp/test', requireAuth, requireRole('admin'), async (req, res) =>
   const sent = await sendEmail({
     to: req.user.email,
     subject: 'Kahalany.Dev — SMTP Test',
-    html: '<div style="font-family:sans-serif;padding:20px"><h2 style="color:#00ff88">SMTP is working!</h2><p>Your email configuration is correct.</p></div>'
+    html: '<div style="font-family:sans-serif;padding:20px;background:#09090b;color:#e4e4e7;border-radius:12px"><h2 style="color:#3b82f6">SMTP is working!</h2><p>Your email configuration is correct.</p></div>'
   });
   if (sent) res.json({ success: true, data: { message: `Test email sent to ${req.user.email}` } });
   else res.status(400).json({ success: false, error: 'SMTP not configured or send failed. Check server logs.' });

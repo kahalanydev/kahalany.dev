@@ -47,60 +47,56 @@ async function sendEmail({ to, subject, html }) {
   }
 }
 
-function sendWelcomeEmail({ email, name, password, role, loginUrl }) {
+// Shared email wrapper matching site theme: #09090b bg, #3b82f6 accent blue, { kahalany.dev } logo
+function emailWrapper(innerHtml) {
+  return `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;border:1px solid #232329">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="font-size:24px;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;margin:0">
+          <span style="color:#71717a">{</span> <span style="color:#e4e4e7">kahalany</span><span style="color:#3b82f6">.</span><span style="color:#e4e4e7">dev</span> <span style="color:#71717a">}</span>
+        </div>
+      </div>
+      ${innerHtml}
+    </div>
+  `;
+}
+
+function sendWelcomeEmail({ email, name, role, inviteUrl }) {
   const displayName = name || email;
   const portalLabel = role === 'client' ? 'Client Portal' : 'Admin Panel';
 
   return sendEmail({
     to: email,
     subject: `You've been invited to Kahalany.Dev ${portalLabel}`,
-    html: `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#1a1a2e;color:#e0e0e0;border-radius:12px">
-        <div style="text-align:center;margin-bottom:24px">
-          <h1 style="color:#00ff88;font-size:24px;margin:0">Kahalany.Dev</h1>
-          <p style="color:#888;margin:4px 0 0">${portalLabel}</p>
-        </div>
-        <p>Hi ${displayName},</p>
-        <p>You've been invited to the <strong>${portalLabel}</strong>. Here are your login credentials:</p>
-        <div style="background:#0d0d1a;padding:16px;border-radius:8px;margin:20px 0;border-left:3px solid #00ff88">
-          <p style="margin:0 0 8px"><strong>Email:</strong> <code style="color:#00ff88">${email}</code></p>
-          <p style="margin:0"><strong>Temporary Password:</strong> <code style="color:#00ff88">${password}</code></p>
-        </div>
-        <p>You'll be asked to change your password on first login.</p>
-        <div style="text-align:center;margin:24px 0">
-          <a href="${loginUrl}" style="display:inline-block;background:#00ff88;color:#0d0d1a;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">Sign In</a>
-        </div>
-        <p style="color:#666;font-size:12px;margin-top:24px;border-top:1px solid #333;padding-top:16px">
-          If you didn't expect this invitation, you can safely ignore this email.
-        </p>
+    html: emailWrapper(`
+      <p style="color:#a1a1aa;font-size:13px;text-align:center;margin:-16px 0 24px">${portalLabel}</p>
+      <p>Hi ${displayName},</p>
+      <p>You've been invited to the <strong style="color:#fff">${portalLabel}</strong>. Click the button below to set up your password and get started:</p>
+      <div style="text-align:center;margin:28px 0">
+        <a href="${inviteUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">Accept Invitation</a>
       </div>
-    `
+      <p style="color:#71717a;font-size:13px">This link expires in 7 days.</p>
+      <p style="color:#52525b;font-size:12px;margin-top:24px;border-top:1px solid #232329;padding-top:16px">
+        If you didn't expect this invitation, you can safely ignore this email.
+      </p>
+    `)
   });
 }
 
-function sendPasswordResetEmail({ email, name, password, loginUrl }) {
+function sendPasswordResetEmail({ email, name, inviteUrl }) {
   const displayName = name || email;
 
   return sendEmail({
     to: email,
     subject: 'Your Kahalany.Dev password has been reset',
-    html: `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#1a1a2e;color:#e0e0e0;border-radius:12px">
-        <div style="text-align:center;margin-bottom:24px">
-          <h1 style="color:#00ff88;font-size:24px;margin:0">Kahalany.Dev</h1>
-        </div>
-        <p>Hi ${displayName},</p>
-        <p>Your password has been reset by an administrator. Here are your new credentials:</p>
-        <div style="background:#0d0d1a;padding:16px;border-radius:8px;margin:20px 0;border-left:3px solid #00ff88">
-          <p style="margin:0 0 8px"><strong>Email:</strong> <code style="color:#00ff88">${email}</code></p>
-          <p style="margin:0"><strong>New Password:</strong> <code style="color:#00ff88">${password}</code></p>
-        </div>
-        <p>You'll be asked to change this password on your next login.</p>
-        <div style="text-align:center;margin:24px 0">
-          <a href="${loginUrl}" style="display:inline-block;background:#00ff88;color:#0d0d1a;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">Sign In</a>
-        </div>
+    html: emailWrapper(`
+      <p>Hi ${displayName},</p>
+      <p>Your password has been reset. Click below to set a new password:</p>
+      <div style="text-align:center;margin:28px 0">
+        <a href="${inviteUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">Set New Password</a>
       </div>
-    `
+      <p style="color:#71717a;font-size:13px">This link expires in 7 days.</p>
+    `)
   });
 }
 

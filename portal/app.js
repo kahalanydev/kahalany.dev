@@ -956,6 +956,10 @@
     const hash = window.location.hash.replace('#/', '') || 'dashboard';
     const parts = hash.split('/');
 
+    // #/invite/:token
+    if (parts[0] === 'invite' && parts[1]) {
+      return { page: 'invite', token: parts[1] };
+    }
     // #/dashboard
     if (parts[0] === 'dashboard' || hash === '') {
       return { page: 'dashboard' };
@@ -980,15 +984,84 @@
     return { page: 'dashboard' };
   }
 
+  // ===== RENDER: INVITE =====
+  async function renderInvite(token) {
+    app.innerHTML = `
+      <div class="login-page">
+        <div class="login-card">
+          <div class="login-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
+          <h2 class="login-title">Set Up Your Password</h2>
+          <div id="inviteMsg"><div class="loading"><div class="spinner"></div> Validating invite...</div></div>
+          <form id="inviteForm" style="display:none">
+            <div id="inviteInfo"></div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" id="invitePass" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+              <label>Confirm Password</label>
+              <input type="password" id="invitePassConfirm" placeholder="Confirm password" required minlength="8" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-primary">Set Password & Sign In</button>
+          </form>
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await fetch('/api/auth/invite/' + token).then(r => r.json());
+      if (!res.success) throw new Error(res.error);
+      const user = res.data.user;
+      $('#inviteMsg').innerHTML = '';
+      $('#inviteInfo').innerHTML = `<p style="color:var(--text-secondary);font-size:14px;margin-bottom:16px">Welcome${user.name ? ', <strong>' + escapeHtml(user.name) + '</strong>' : ''}! Set your password to get started.</p>`;
+      $('#inviteForm').style.display = 'block';
+      $('#invitePass').focus();
+    } catch (err) {
+      $('#inviteMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div><p style="margin-top:16px"><a href="#/login" style="color:var(--accent)">Go to login</a></p>`;
+      return;
+    }
+
+    $('#inviteForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pass = $('#invitePass').value;
+      const confirm = $('#invitePassConfirm').value;
+      if (pass !== confirm) {
+        $('#inviteMsg').innerHTML = '<div class="alert alert-error">Passwords do not match</div>';
+        return;
+      }
+      const btn = $('button[type="submit"]', e.target);
+      btn.textContent = 'Setting up...'; btn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/invite/' + token + '/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass })
+        }).then(r => r.json());
+        if (!res.success) throw new Error(res.error);
+        state.token = res.data.token;
+        state.user = res.data.user;
+        localStorage.setItem('portal_token', state.token);
+        window.location.hash = '#/dashboard';
+        render();
+      } catch (err) {
+        $('#inviteMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        btn.textContent = 'Set Password & Sign In'; btn.disabled = false;
+      }
+    });
+  }
+
   // ===== MAIN RENDER =====
   async function render() {
+    // Handle invite page before auth check (public route)
+    const r = route();
+    if (r.page === 'invite') return renderInvite(r.token);
+
     if (!state.token || !state.user) {
       const authed = await checkAuth();
       if (!authed) return renderLogin();
-      // Ensure client role
-      if (state.user.role !== 'client') {
+      if (!['client', 'admin', 'staff'].includes(state.user.role)) {
         app.innerHTML = `<div class="login-page"><div class="login-card">
-          <div class="alert alert-error">This portal is for clients. Admins should use <a href="/admin" style="color:var(--accent)">/admin</a>.</div>
+          <div class="alert alert-error">Access denied.</div>
         </div></div>`;
         return;
       }
@@ -996,7 +1069,6 @@
 
     if (state.user.must_change_password) return renderChangePassword();
 
-    const r = route();
     switch (r.page) {
       case 'project': return renderProject(r.projectId);
       case 'plan': return renderPlan(r.projectId);
