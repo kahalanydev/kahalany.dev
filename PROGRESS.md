@@ -441,11 +441,62 @@ Generates project-specific `CLAUDE.md` with:
 
 ---
 
+## 2026-03-29 — Email Notifications, Contact Form, Light Theme (Phase 4 cont.)
+
+### Email System (Nodemailer)
+- Created `server/utils/email.js` — SMTP transport via Nodemailer, config read from DB
+- Functions: `sendEmail()`, `sendWelcomeEmail()`, `sendPasswordResetEmail()`, `getSmtpConfig()`
+- Branded HTML email templates (dark theme styling, Kahalany.Dev branding)
+- Graceful fallback: logs to console if SMTP not configured (no hard failures)
+- **Welcome emails**: Auto-sent when admin creates new user (admin, staff, or client) — includes credentials + login URL
+- **Password reset emails**: Auto-sent when admin resets a user's password
+- **Contact form notifications**: New submissions emailed to hello@kahalany.dev
+- Admin SMTP settings: `GET/PUT /api/auth/smtp/config`, `POST /api/auth/smtp/test` (send test email)
+
+### Contact Form ("Describe Your Idea")
+- Replaced old contact section with "What do you want to build?" form
+- Fields: name, email, idea/message textarea
+- `POST /api/contact` endpoint — rate-limited (1/min per IP), stores in `contact_submissions` table
+- Email notification sent to hello@kahalany.dev on each submission
+- "Or reach out directly" divider with WhatsApp link (wa.me/18623005027) + email button
+
+### Light/Dark Theme Toggle
+- **All three frontends** (main site, admin, portal) now support light mode
+- CSS: `[data-theme="light"]` overrides all `:root` custom properties
+- Main site: moon/sun toggle button in nav bar
+- Admin: theme toggle button in sidebar bottom
+- Portal: theme toggle button in sidebar
+- Persistence: `localStorage` with separate keys (`theme`, `admin_theme`, `portal_theme`)
+- Default: dark theme
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `server/utils/email.js` | Nodemailer email utility (welcome, reset, generic send) |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/index.js` | Added `POST /api/contact` endpoint with rate limiting |
+| `server/db.js` | Added `contact_submissions` table |
+| `server/routes/auth.js` | Added SMTP config endpoints, welcome/reset email on user creation/reset |
+| `server/routes/admin.js` | Added welcome email on client user creation |
+| `index.html` | New contact form section, theme toggle button in nav |
+| `styles.css` | Light theme variables, `.idea-form` styles, `.theme-toggle` styles, `.contact-divider` |
+| `script.js` | Contact form submit handler, theme toggle handler |
+| `admin/app.js` | SMTP settings card, theme toggle in sidebar |
+| `admin/styles.css` | Light theme variable overrides, `.theme-toggle-btn` styles |
+| `portal/app.js` | Theme toggle in sidebar |
+| `portal/styles.css` | Light theme variable overrides, `.theme-toggle-btn` styles |
+| `package.json` | Added `nodemailer` dependency |
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
-- [ ] Add more contact methods (phone, WhatsApp, Calendly)
+- [x] ~~Add more contact methods (phone, WhatsApp, Calendly)~~ — Added WhatsApp + contact form
 - [ ] Add OG meta tags + OG image for social sharing
-- [ ] Add light theme toggle
+- [x] ~~Add light theme toggle~~ — Added to all three frontends
 - [ ] Consider adding a blog/case-studies section
 - [x] ~~Add analytics (Plausible or similar privacy-respecting)~~ — Built custom analytics system
 - [ ] Add IP blocking capability from admin panel

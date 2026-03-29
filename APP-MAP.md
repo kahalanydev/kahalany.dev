@@ -18,6 +18,8 @@ Portfolio/showcase website for Kahalany.Dev — a custom software development pr
 - **SSL** — Let's Encrypt via Traefik (auto-provisioned)
 - **Domain** — kahalany.dev on Cloudflare (DNS only, not proxied)
 - **Email** — hello@kahalany.dev via Cloudflare Email Routing → kahalanydev@gmail.com
+- **SMTP** — Nodemailer for outbound email (admin-configurable SMTP settings stored in DB)
+- **File Uploads** — Multer with UUID filenames, MIME whitelist, extension blacklist
 
 ## File Structure
 ```
@@ -33,12 +35,15 @@ Kahalany.Dev Site/
 │   ├── middleware/
 │   │   └── auth.js         # Auth: requireAuth, requireRole, enforceOrgScope, requireDevAuth, rateLimit
 │   ├── routes/
-│   │   ├── auth.js         # POST /api/auth/login, /change-password, GET/POST/DELETE /api/auth/users
+│   │   ├── auth.js         # POST /api/auth/login, /change-password, GET/POST/DELETE /api/auth/users, SMTP config, Google OAuth
 │   │   ├── track.js        # POST /api/track/visit, /api/track/event
 │   │   ├── admin.js        # Admin API: dashboard, security, analytics, orgs, projects, milestones, tickets, plans, dev-keys
-│   │   └── portal.js       # Portal API: dashboard, projects, tickets, comments, activity, plan approval
+│   │   ├── portal.js       # Portal API: dashboard, projects, tickets, comments, activity, plan approval
+│   │   ├── dev.js          # Dev API: sync, progress updates, ticket resolution (HMAC-signed)
+│   │   └── uploads.js      # File upload/download/delete with auth-gated access
 │   └── utils/
-│       └── detection.js    # Bot detection, rate tracking, suspicious activity logging
+│       ├── detection.js    # Bot detection, rate tracking, suspicious activity logging
+│       └── email.js        # Nodemailer SMTP email (welcome, password reset, contact notifications)
 ├── admin/
 │   ├── index.html          # Admin panel shell (loads Chart.js + app.js)
 │   ├── styles.css          # Admin dark theme styles
@@ -68,23 +73,26 @@ Client → Traefik (SSL) → Express (:8080)
   ├── /                    → static index.html + assets
   ├── /admin               → admin SPA (admin/index.html)
   ├── /portal              → client portal SPA (portal/index.html)
-  ├── /api/auth/*          → auth routes (JWT login, user management)
+  ├── /api/auth/*          → auth routes (JWT login, user management, SMTP config, Google OAuth)
   ├── /api/track/*         → tracking endpoints (visits, events)
   ├── /api/admin/*         → admin data API (requires JWT + admin/staff role)
   ├── /api/portal/*        → portal data API (requires JWT + org-scoped access)
   ├── /api/dev/*           → dev API (requires HMAC signature, for Claude Code sync)
+  ├── /api/uploads/*       → file upload/download/delete (auth-gated)
+  ├── /api/contact         → contact form submission (rate-limited, public)
   └── 404                  → suspicious activity logger
 ```
 
 ### Database Schema (SQLite — 17 tables)
 
 **Core (existing)**:
-- **config** — key/value store (JWT secret)
-- **users** — all accounts: admin, staff, client (email, bcrypt hash, role, org_id)
+- **config** — key/value store (JWT secret, SMTP settings, Google OAuth config)
+- **users** — all accounts: admin, staff, client (email, bcrypt hash, role, org_id, google_id, avatar_url)
 - **visits** — visitor sessions (IP, UA, geo, device, referrer, bot flag)
 - **events** — tracking events (pageview, click, section_view, heartbeat, leave)
 - **suspicious_activity** — flagged events (rate spikes, scanner paths, bot UAs)
 - **geo_cache** — IP geolocation cache (from ip-api.com)
+- **contact_submissions** — contact form entries (name, email, message, ip, created_at)
 
 **Client Portal (new)**:
 - **organizations** — client companies
@@ -93,7 +101,7 @@ Client → Traefik (SSL) → Express (:8080)
 - **milestones** — project phases with status and sort order
 - **tickets** — bug reports, feature requests, tasks, modifications, questions
 - **ticket_comments** — with `is_internal` flag for admin-only notes
-- **ticket_attachments** — prepared for file uploads
+- **ticket_attachments** — file uploads (original name, stored UUID filename, MIME, size, uploader)
 - **activity_log** — immutable audit trail for all state changes
 - **project_plans** — versioned plans for client approval
 - **dev_keys** — HMAC keys for Claude Code dev API
@@ -128,6 +136,7 @@ Client → Traefik (SSL) → Express (:8080)
 - Fixed top nav with blur backdrop on scroll
 - Logo: `{ kahalany.dev }` in JetBrains Mono
 - Links: Work, Capabilities, Process, Let's Talk (CTA)
+- Theme toggle button (moon/sun icons) — switches between dark and light themes
 - Mobile: hamburger → fullscreen overlay menu
 - All nav links have `data-track` attributes
 
@@ -150,9 +159,13 @@ Client → Traefik (SSL) → Express (:8080)
 ### 5. Process ("How We Work")
 - 4-step vertical timeline
 
-### 6. Contact
-- Email link: hello@kahalany.dev (tracked)
-- Code block visual (`new-project.ts`)
+### 6. Contact ("What Do You Want to Build?")
+- "Describe your idea" form: name, email, message textarea
+- Submissions stored in DB + email notification sent to hello@kahalany.dev
+- Rate limited: 1 submission per minute per IP
+- "Or reach out directly" divider with:
+  - WhatsApp link (wa.me/18623005027)
+  - Email link: hello@kahalany.dev (tracked)
 
 ### 7. Footer
 - Logo, nav links, copyright
@@ -190,6 +203,15 @@ Client → Traefik (SSL) → Express (:8080)
 - Change password form
 - Admin user management (list, add, remove)
 - New admin gets random temp password (must change on first login)
+- SMTP configuration card (host, port, user, pass, from address) with test email button
+- Google OAuth configuration (client ID, secret, enable/disable)
+
+### Email System
+- **Nodemailer** with admin-configurable SMTP (settings stored in `config` table)
+- **Welcome emails**: Sent when admin creates new admin/staff/client user — includes credentials + login link
+- **Password reset emails**: Sent when admin resets a user's password
+- **Contact notifications**: New contact form submissions emailed to hello@kahalany.dev
+- **Graceful fallback**: If SMTP not configured, logs to console instead of failing
 
 ## Client Portal Pages
 
@@ -239,6 +261,13 @@ Client → Traefik (SSL) → Express (:8080)
 - Status/priority/assignment controls
 - Comment thread with internal note option (yellow-bordered)
 - Post as public or internal comment
+
+## Theming
+- **Dark/light mode** across all three frontends (main site, admin, portal)
+- CSS custom properties with `[data-theme="light"]` overrides
+- Theme toggle buttons on each frontend
+- Persistence via localStorage (separate keys: `theme`, `admin_theme`, `portal_theme`)
+- Default: dark theme
 
 ## Deployment
 - **Docker**: `node:20-alpine` runs Express on port 8080
