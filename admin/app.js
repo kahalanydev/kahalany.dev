@@ -1831,7 +1831,9 @@
         const result = form.querySelector('.new-client-result');
         try {
           const res = await api(`/admin/clients/${orgId}/users`, { method: 'POST', body: JSON.stringify({ email, name }) });
-          result.innerHTML = `<div class="alert alert-success">Created! Temp password: <strong style="font-family:var(--mono)">${escapeHtml(res.data.temporary_password)}</strong><br><small>Share securely — must change on first login.</small></div>`;
+          result.innerHTML = res.data.linked
+            ? `<div class="alert alert-success">${escapeHtml(res.data.message)}</div>`
+            : `<div class="alert alert-success">Created! Temp password: <strong style="font-family:var(--mono)">${escapeHtml(res.data.temporary_password)}</strong><br><small>Share securely — must change on first login.</small></div>`;
           setTimeout(() => renderClients(), 3000);
         } catch (err) { result.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
       }));

@@ -284,8 +284,18 @@ router.post('/clients/:orgId/users', (req, res) => {
   const { email, name } = req.body;
   if (!email) return res.status(400).json({ success: false, error: 'Email required' });
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
-  if (existing) return res.status(409).json({ success: false, error: 'User with this email already exists' });
+  const existing = db.prepare('SELECT id, role, org_id FROM users WHERE email = ?').get(email.toLowerCase().trim());
+
+  if (existing) {
+    // If user exists but isn't linked to an org yet (e.g. admin/staff), link them
+    if (existing.org_id) {
+      return res.status(409).json({ success: false, error: 'User already belongs to an organization' });
+    }
+    db.prepare('UPDATE users SET org_id = ? WHERE id = ?').run(org.id, existing.id);
+    logActivity(db, { userId: req.user.id, action: 'user_linked_to_org', entityType: 'user', entityId: String(existing.id),
+      details: { email, org_name: org.name, role: existing.role }, ip: req.ip });
+    return res.json({ success: true, data: { user: { id: existing.id, email, name }, linked: true, message: `Existing ${existing.role} user linked to ${org.name}` } });
+  }
 
   const password = crypto.randomBytes(12).toString('base64url');
   const hash = bcrypt.hashSync(password, 12);
