@@ -433,6 +433,70 @@ router.post('/projects/:projectId/propose', (req, res) => {
   res.json({ success: true, data: { message: 'Plan sent to client for approval' } });
 });
 
+// ===== PROJECT MEMBERS =====
+
+// POST /api/admin/projects/:projectId/members — assign user to project
+router.post('/projects/:projectId/members', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT id, name FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+  const { user_id, role } = req.body;
+  if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
+
+  const user = db.prepare('SELECT id, name, email, role as user_role FROM users WHERE id = ?').get(user_id);
+  if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+  // Check if already a member
+  const existing = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(project.id, user_id);
+  if (existing) return res.status(409).json({ success: false, error: 'User is already a member of this project' });
+
+  const memberRole = ['member', 'viewer'].includes(role) ? role : 'member';
+  const id = generateId();
+  db.prepare("INSERT INTO project_members (id, project_id, user_id, role, added_at) VALUES (?, ?, ?, ?, datetime('now'))")
+    .run(id, project.id, user_id, memberRole);
+
+  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'member_added',
+    entityType: 'project', entityId: project.id,
+    details: { member_user_id: user_id, member_name: user.name, member_email: user.email, role: memberRole }, ip: req.ip });
+
+  res.json({ success: true, data: { member: { id, project_id: project.id, user_id, role: memberRole, name: user.name, email: user.email, user_role: user.user_role } } });
+});
+
+// DELETE /api/admin/projects/:projectId/members/:userId — remove user from project
+router.delete('/projects/:projectId/members/:userId', (req, res) => {
+  const db = getDb();
+  const project = db.prepare('SELECT id, name FROM projects WHERE id = ?').get(req.params.projectId);
+  if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+  const membership = db.prepare('SELECT pm.id, u.name, u.email FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? AND pm.user_id = ?')
+    .get(project.id, req.params.userId);
+  if (!membership) return res.status(404).json({ success: false, error: 'User is not a member of this project' });
+
+  db.prepare('DELETE FROM project_members WHERE project_id = ? AND user_id = ?').run(project.id, req.params.userId);
+
+  logActivity(db, { projectId: project.id, userId: req.user.id, action: 'member_removed',
+    entityType: 'project', entityId: project.id,
+    details: { member_user_id: req.params.userId, member_name: membership.name, member_email: membership.email }, ip: req.ip });
+
+  res.json({ success: true, data: { message: `${membership.name} removed from project` } });
+});
+
+// GET /api/admin/users/search?q= — search users for member assignment
+router.get('/users/search', (req, res) => {
+  const db = getDb();
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.status(400).json({ success: false, error: 'Search query must be at least 2 characters' });
+
+  const users = db.prepare(`
+    SELECT id, name, email, role, org_id FROM users
+    WHERE (name LIKE ? OR email LIKE ?) AND role IN ('client', 'admin', 'staff')
+    ORDER BY name LIMIT 20
+  `).all(`%${q}%`, `%${q}%`);
+
+  res.json({ success: true, data: { users } });
+});
+
 // ===== MILESTONES =====
 
 // POST /api/admin/projects/:projectId/milestones

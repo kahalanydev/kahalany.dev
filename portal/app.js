@@ -48,8 +48,8 @@
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
-    if (res.data.user.role !== 'client') {
-      throw new Error('This portal is for clients. Admins should use /admin');
+    if (!['client', 'admin', 'staff'].includes(res.data.user.role)) {
+      throw new Error('Access denied');
     }
     state.token = res.data.token;
     state.user = res.data.user;
@@ -348,6 +348,7 @@
               <span class="project-card-name">${escapeHtml(p.name)}</span>
               ${statusBadge(p.status)}
             </div>
+            ${p.org_name ? `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${escapeHtml(p.org_name)}</div>` : ''}
             <div class="progress-bar"><div class="progress-bar-fill" style="width:${p.progress_percent}%"></div></div>
             <div class="progress-label" style="display:flex;justify-content:space-between">
               <span>${p.progress_percent}% complete</span>

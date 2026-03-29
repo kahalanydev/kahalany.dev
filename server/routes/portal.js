@@ -13,32 +13,39 @@ router.use(rateLimit(60, 60000)); // 60 req/min
 // GET /api/portal/dashboard
 router.get('/dashboard', (req, res) => {
   const db = getDb();
+  const userId = req.user.id;
   const orgId = req.user.org_id;
 
   if (!orgId && !['admin', 'staff'].includes(req.user.role)) {
-    return res.status(403).json({ success: false, error: 'No organization assigned' });
+    // Check if user has any project_members assignments even without an org
+    const hasMemberships = db.prepare('SELECT 1 FROM project_members WHERE user_id = ?').get(userId);
+    if (!hasMemberships) {
+      return res.status(403).json({ success: false, error: 'No organization assigned' });
+    }
   }
 
-  // For clients: their org's projects. For admin/staff: all projects (they shouldn't normally use this endpoint)
-  const projects = req.user.role === 'client'
-    ? db.prepare(`
-        SELECT p.*, o.name as org_name,
-               (SELECT COUNT(*) FROM tickets t WHERE t.project_id = p.id AND t.status IN ('open','in_progress')) as open_tickets
-        FROM projects p JOIN organizations o ON o.id = p.org_id
-        WHERE p.org_id = ? AND p.status != 'archived'
-        ORDER BY p.updated_at DESC
-      `).all(orgId)
-    : [];
+  // Org projects + individually assigned projects (deduplicated)
+  const projects = db.prepare(`
+    SELECT DISTINCT p.*, o.name as org_name,
+           (SELECT COUNT(*) FROM tickets t WHERE t.project_id = p.id AND t.status IN ('open','in_progress')) as open_tickets
+    FROM projects p
+    JOIN organizations o ON o.id = p.org_id
+    LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+    WHERE (? IS NOT NULL AND p.org_id = ? OR pm.user_id IS NOT NULL) AND p.status != 'archived'
+    ORDER BY p.updated_at DESC
+  `).all(userId, orgId || null, orgId || null);
 
-  const recentActivity = req.user.role === 'client'
+  // Activity for all visible projects
+  const projectIds = projects.map(p => p.id);
+  const recentActivity = projectIds.length > 0
     ? db.prepare(`
         SELECT a.*, u.name as user_name
         FROM activity_log a
         LEFT JOIN users u ON u.id = a.user_id
-        WHERE a.project_id IN (SELECT id FROM projects WHERE org_id = ?)
+        WHERE a.project_id IN (${projectIds.map(() => '?').join(',')})
           AND a.action NOT LIKE '%internal%'
         ORDER BY a.created_at DESC LIMIT 20
-      `).all(orgId)
+      `).all(...projectIds)
     : [];
 
   res.json({ success: true, data: { projects, recentActivity } });
@@ -98,6 +105,11 @@ router.post('/projects/:projectId/approve', enforceOrgScope, requireRole('client
 
   if (project.status !== 'proposed') {
     return res.status(400).json({ success: false, error: 'Project is not in proposed status' });
+  }
+
+  // Only users from the owning org can approve
+  if (!req.user.org_id || req.user.org_id !== project.org_id) {
+    return res.status(403).json({ success: false, error: 'Only the owning organization can approve this project' });
   }
 
   const plan = db.prepare('SELECT * FROM project_plans WHERE project_id = ?').get(project.id);
@@ -207,13 +219,16 @@ router.get('/projects/:projectId/tickets/:ticketId', enforceOrgScope, (req, res)
 // POST /api/portal/tickets/:ticketId/comments — client adds comment
 router.post('/tickets/:ticketId/comments', (req, res) => {
   const db = getDb();
-  const ticket = db.prepare('SELECT t.* FROM tickets t JOIN projects p ON p.id = t.project_id WHERE t.id = ?').get(req.params.ticketId);
+  const ticket = db.prepare('SELECT t.*, p.org_id as project_org_id FROM tickets t JOIN projects p ON p.id = t.project_id WHERE t.id = ?').get(req.params.ticketId);
   if (!ticket) return res.status(404).json({ success: false, error: 'Not found' });
 
-  // Verify org scope for clients
+  // Verify access for clients: org match or project_members assignment
   if (req.user.role === 'client') {
-    const project = db.prepare('SELECT org_id FROM projects WHERE id = ?').get(ticket.project_id);
-    if (project.org_id !== req.user.org_id) return res.status(404).json({ success: false, error: 'Not found' });
+    const isOrgMember = req.user.org_id && ticket.project_org_id === req.user.org_id;
+    const isProjectMember = !!db.prepare(
+      'SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?'
+    ).get(ticket.project_id, req.user.id);
+    if (!isOrgMember && !isProjectMember) return res.status(404).json({ success: false, error: 'Not found' });
   }
 
   const { body } = req.body;

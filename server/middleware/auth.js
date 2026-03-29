@@ -36,7 +36,7 @@ function requireRole(...roles) {
   };
 }
 
-// ===== Org Scope (clients can only see their own org's projects) =====
+// ===== Org Scope (clients see org projects + projects they're individually assigned to) =====
 function enforceOrgScope(req, res, next) {
   const projectId = req.params.projectId;
   if (!projectId) return next();
@@ -45,9 +45,15 @@ function enforceOrgScope(req, res, next) {
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
   if (!project) return res.status(404).json({ success: false, error: 'Not found' });
 
-  // Clients can only access their own org's projects
-  if (req.user.role === 'client' && project.org_id !== req.user.org_id) {
-    return res.status(404).json({ success: false, error: 'Not found' });
+  if (req.user.role === 'client') {
+    const isOrgMember = req.user.org_id && project.org_id === req.user.org_id;
+    const isProjectMember = !!db.prepare(
+      'SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?'
+    ).get(projectId, req.user.id);
+
+    if (!isOrgMember && !isProjectMember) {
+      return res.status(404).json({ success: false, error: 'Not found' });
+    }
   }
 
   req.project = project;

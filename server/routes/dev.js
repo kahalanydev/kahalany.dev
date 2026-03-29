@@ -280,4 +280,63 @@ router.post('/activity', (req, res) => {
   res.json({ success: true, data: { message: 'Activity logged' } });
 });
 
+// ===== SEED (temporary) =====
+
+// POST /api/dev/seed — seed org + project + milestones
+router.post('/seed', (req, res) => {
+  const db = getDb();
+  const { org_name, org_email, project_name, project_slug, project_description, tech_stack, status, milestones } = req.body;
+
+  if (!org_name || !project_name || !project_slug) {
+    return res.status(400).json({ success: false, error: 'org_name, project_name, project_slug required' });
+  }
+
+  // Check if project already exists
+  const existingProject = db.prepare('SELECT id FROM projects WHERE slug = ?').get(project_slug);
+  if (existingProject) {
+    return res.status(409).json({ success: false, error: 'Project with this slug already exists', project_id: existingProject.id });
+  }
+
+  // Create or find org
+  let org = db.prepare('SELECT * FROM organizations WHERE name = ?').get(org_name);
+  if (!org) {
+    const orgId = generateId();
+    db.prepare("INSERT INTO organizations (id, name, primary_email, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))")
+      .run(orgId, org_name, org_email || null);
+    org = { id: orgId, name: org_name };
+  }
+
+  // Create project
+  const validStatuses = ['planning', 'proposed', 'approved', 'in_progress', 'review', 'completed', 'maintenance', 'archived'];
+  const validMsStatuses = ['upcoming', 'in_progress', 'completed', 'skipped'];
+  const projectStatus = validStatuses.includes(status) ? status : 'in_progress';
+
+  const projectId = generateId();
+  db.prepare(`
+    INSERT INTO projects (id, org_id, name, slug, description, tech_stack, status, progress_percent)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+  `).run(projectId, org.id, project_name, project_slug, project_description || null, tech_stack ? JSON.stringify(tech_stack) : null, projectStatus);
+
+  // Create milestones
+  if (milestones && Array.isArray(milestones)) {
+    for (let i = 0; i < milestones.length; i++) {
+      const m = milestones[i];
+      const msStatus = validMsStatuses.includes(m.status) ? m.status : 'upcoming';
+      db.prepare("INSERT INTO milestones (id, project_id, title, description, status, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))")
+        .run(generateId(), projectId, m.title, m.description || null, msStatus, i + 1);
+    }
+  }
+
+  // Recalculate progress
+  const total = db.prepare("SELECT COUNT(*) as c FROM milestones WHERE project_id = ?").get(projectId).c;
+  const done = db.prepare("SELECT COUNT(*) as c FROM milestones WHERE project_id = ? AND status IN ('completed', 'skipped')").get(projectId).c;
+  const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+  db.prepare("UPDATE projects SET progress_percent = ? WHERE id = ?").run(progress, projectId);
+
+  logActivity(db, { projectId, action: 'project_seeded', entityType: 'project', entityId: projectId,
+    details: { org_name: org.name, seeded_by: 'dev_api' } });
+
+  res.json({ success: true, data: { org_id: org.id, project_id: projectId, project_slug, progress_percent: progress } });
+});
+
 module.exports = router;

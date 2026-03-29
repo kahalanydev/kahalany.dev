@@ -1329,6 +1329,31 @@
           </div>
         </div>
 
+        <!-- Members -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Project Members</span>
+            <button class="btn btn-secondary btn-sm" id="addMemberBtn">+ Add Member</button>
+          </div>
+          <div id="addMemberForm" style="display:none;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="memberSearch" placeholder="Search by name or email..." style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+            </div>
+            <div id="memberSearchResults" style="margin-top:8px"></div>
+          </div>
+          ${members.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;padding:4px 0">No members assigned. Members from other organizations can be added here for cross-org access.</p>' :
+            members.map(m => `
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface-3)">
+                <div style="width:32px;height:32px;border-radius:50%;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--text-dim)">${escapeHtml((m.name || '?')[0].toUpperCase())}</div>
+                <div style="flex:1">
+                  <div style="font-size:14px;font-weight:500">${escapeHtml(m.name)}</div>
+                  <div style="font-size:12px;color:var(--text-dim)">${escapeHtml(m.email)} <span class="badge badge-gray" style="font-size:10px">${m.user_role}</span> <span class="badge badge-blue" style="font-size:10px">${m.role}</span></div>
+                </div>
+                <button class="btn btn-danger btn-sm member-remove" data-user-id="${m.user_id}" data-name="${escapeHtml(m.name).replace(/"/g, '&quot;')}" style="padding:2px 8px;font-size:10px">\u2715</button>
+              </div>
+            `).join('')}
+        </div>
+
         <!-- Tickets -->
         <div class="card">
           <div class="card-header"><span class="card-title">Tickets</span></div>
@@ -1388,6 +1413,55 @@
         if (!confirm('Delete this milestone?')) return;
         try {
           await api(`/admin/milestones/${btn.dataset.msId}`, { method: 'DELETE' });
+          renderProjectDetail(projectId);
+        } catch (err) { alert(err.message); }
+      }));
+
+      // Members
+      $('#addMemberBtn').addEventListener('click', () => {
+        const form = $('#addMemberForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        if (form.style.display === 'block') $('#memberSearch').focus();
+      });
+
+      let memberSearchTimeout;
+      $('#memberSearch').addEventListener('input', (e) => {
+        clearTimeout(memberSearchTimeout);
+        const q = e.target.value.trim();
+        if (q.length < 2) { $('#memberSearchResults').innerHTML = ''; return; }
+        memberSearchTimeout = setTimeout(async () => {
+          try {
+            const res = await api(`/admin/users/search?q=${encodeURIComponent(q)}`);
+            const existingIds = members.map(m => m.user_id);
+            const available = res.data.users.filter(u => !existingIds.includes(u.id));
+            if (available.length === 0) {
+              $('#memberSearchResults').innerHTML = '<p style="color:var(--text-dim);font-size:12px">No matching users found.</p>';
+              return;
+            }
+            $('#memberSearchResults').innerHTML = available.map(u => `
+              <div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;cursor:pointer;background:var(--surface)" class="member-search-row" data-user-id="${u.id}">
+                <div style="width:28px;height:28px;border-radius:50%;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--text-dim)">${escapeHtml((u.name || '?')[0].toUpperCase())}</div>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:500">${escapeHtml(u.name)}</div>
+                  <div style="font-size:11px;color:var(--text-dim)">${escapeHtml(u.email)} <span class="badge badge-gray" style="font-size:10px">${u.role}</span></div>
+                </div>
+                <button class="btn btn-primary btn-sm" style="font-size:11px">Add</button>
+              </div>
+            `).join('');
+            $$('.member-search-row').forEach(row => row.addEventListener('click', async () => {
+              try {
+                await api(`/admin/projects/${projectId}/members`, { method: 'POST', body: JSON.stringify({ user_id: row.dataset.userId }) });
+                renderProjectDetail(projectId);
+              } catch (err) { alert(err.message); }
+            }));
+          } catch (err) { $('#memberSearchResults').innerHTML = `<p style="color:var(--error);font-size:12px">${escapeHtml(err.message)}</p>`; }
+        }, 300);
+      });
+
+      $$('.member-remove').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm(`Remove ${btn.dataset.name} from this project?`)) return;
+        try {
+          await api(`/admin/projects/${projectId}/members/${btn.dataset.userId}`, { method: 'DELETE' });
           renderProjectDetail(projectId);
         } catch (err) { alert(err.message); }
       }));
