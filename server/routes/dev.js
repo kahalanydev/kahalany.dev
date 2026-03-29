@@ -283,28 +283,33 @@ router.post('/activity', (req, res) => {
 // ===== TEMPORARY: Seed PCG project (remove after use) =====
 router.post('/seed-pcg', (req, res) => {
   const db = getDb();
+  let projectId, orgId;
 
-  // Check if already exists
-  const existing = db.prepare("SELECT id FROM projects WHERE slug = 'PassaicCliftonGemach'").get();
-  if (existing) return res.json({ success: false, error: 'PCG project already exists', project_id: existing.id });
+  const existing = db.prepare("SELECT id, org_id FROM projects WHERE slug = 'PassaicCliftonGemach'").get();
+  if (existing) {
+    const hasMilestones = db.prepare("SELECT COUNT(*) as c FROM milestones WHERE project_id = ?").get(existing.id).c;
+    if (hasMilestones > 0) {
+      return res.json({ success: false, error: 'PCG project fully set up already', project_id: existing.id });
+    }
+    projectId = existing.id;
+    orgId = existing.org_id;
+  } else {
+    orgId = generateId();
+    db.prepare(`INSERT INTO organizations (id, name, primary_email, created_at, updated_at)
+      VALUES (?, 'Passaic Clifton Gemach', '', datetime('now'), datetime('now'))`)
+      .run(orgId);
 
-  // 1. Create organization
-  const orgId = generateId();
-  db.prepare(`INSERT INTO organizations (id, name, primary_email, created_at, updated_at)
-    VALUES (?, 'Passaic Clifton Gemach', '', datetime('now'), datetime('now'))`)
-    .run(orgId);
+    projectId = generateId();
+    db.prepare(`INSERT INTO projects (id, org_id, name, slug, description, status, tech_stack, progress_percent, created_at, updated_at, scaffolded_at)
+      VALUES (?, ?, 'Passaic Clifton Gemach', 'PassaicCliftonGemach',
+      'Interest-free loan fund dashboard. Syncs financial data from Wave Apps (CSV + GraphQL API). Three role-based portals: Admin, Borrower, and Lender. 26 phases completed.',
+      'maintenance',
+      'Laravel 12, PHP 8.3, MySQL, Tailwind CSS 4, Chart.js, Vite, Docker/Coolify',
+      100, datetime('now'), datetime('now'), datetime('now'))`)
+      .run(projectId, orgId);
+  }
 
-  // 2. Create project — slug matches local folder name for sync
-  const projectId = generateId();
-  db.prepare(`INSERT INTO projects (id, org_id, name, slug, description, status, tech_stack, progress_percent, created_at, updated_at, scaffolded_at)
-    VALUES (?, ?, 'Passaic Clifton Gemach', 'PassaicCliftonGemach',
-    'Interest-free loan fund dashboard. Syncs financial data from Wave Apps (CSV + GraphQL API). Three role-based portals: Admin, Borrower, and Lender. 26 phases completed.',
-    'maintenance',
-    'Laravel 12, PHP 8.3, MySQL, Tailwind CSS 4, Chart.js, Vite, Docker/Coolify',
-    100, datetime('now'), datetime('now'), datetime('now'))`)
-    .run(projectId, orgId);
-
-  // 3. Future enhancement milestones
+  // Future enhancement milestones
   const milestones = [
     ['Payment Notifications & Overdue Detection', 'Email notifications for overdue payments + auto-detection system'],
     ['PDF Exports & Receipts', 'PDF export for loan statements + borrower payment receipts'],
@@ -324,7 +329,6 @@ router.post('/seed-pcg', (req, res) => {
   logActivity(db, { projectId, action: 'project_created', entityType: 'project', entityId: projectId,
     details: { created_via: 'seed_endpoint', phases_completed: 26 } });
 
-  // Return everything needed for .portal.json
   res.json({
     success: true,
     data: {
