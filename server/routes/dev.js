@@ -290,8 +290,8 @@ router.post('/seed-pcg', (req, res) => {
 
   // 1. Create organization
   const orgId = generateId();
-  db.prepare(`INSERT INTO organizations (id, name, slug, contact_email, created_at, updated_at)
-    VALUES (?, 'Passaic Clifton Gemach', 'passaic-clifton-gemach', '', datetime('now'), datetime('now'))`)
+  db.prepare(`INSERT INTO organizations (id, name, primary_email, created_at, updated_at)
+    VALUES (?, 'Passaic Clifton Gemach', '', datetime('now'), datetime('now'))`)
     .run(orgId);
 
   // 2. Create project — slug matches local folder name for sync
