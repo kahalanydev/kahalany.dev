@@ -280,4 +280,67 @@ router.post('/activity', (req, res) => {
   res.json({ success: true, data: { message: 'Activity logged' } });
 });
 
+// ===== TEMPORARY: Seed PCG project (remove after use) =====
+router.post('/seed-pcg', (req, res) => {
+  const db = getDb();
+
+  // Check if already exists
+  const existing = db.prepare("SELECT id FROM projects WHERE slug = 'PassaicCliftonGemach'").get();
+  if (existing) return res.json({ success: false, error: 'PCG project already exists', project_id: existing.id });
+
+  // 1. Create organization
+  const orgId = generateId();
+  db.prepare(`INSERT INTO organizations (id, name, slug, contact_email, created_at, updated_at)
+    VALUES (?, 'Passaic Clifton Gemach', 'passaic-clifton-gemach', '', datetime('now'), datetime('now'))`)
+    .run(orgId);
+
+  // 2. Create project — slug matches local folder name for sync
+  const projectId = generateId();
+  db.prepare(`INSERT INTO projects (id, org_id, name, slug, description, status, tech_stack, progress_percent, created_at, updated_at, scaffolded_at)
+    VALUES (?, ?, 'Passaic Clifton Gemach', 'PassaicCliftonGemach',
+    'Interest-free loan fund dashboard. Syncs financial data from Wave Apps (CSV + GraphQL API). Three role-based portals: Admin, Borrower, and Lender. 26 phases completed.',
+    'maintenance',
+    'Laravel 12, PHP 8.3, MySQL, Tailwind CSS 4, Chart.js, Vite, Docker/Coolify',
+    100, datetime('now'), datetime('now'), datetime('now'))`)
+    .run(projectId, orgId);
+
+  // 3. Future enhancement milestones
+  const milestones = [
+    ['Payment Notifications & Overdue Detection', 'Email notifications for overdue payments + auto-detection system'],
+    ['PDF Exports & Receipts', 'PDF export for loan statements + borrower payment receipts'],
+    ['Admin Dashboard Charts', 'Add charts and visualizations to the admin dashboard'],
+    ['Account Security', 'Password reset flow + two-factor authentication for admin'],
+  ];
+
+  const msIds = [];
+  milestones.forEach((m, i) => {
+    const msId = generateId();
+    msIds.push({ id: msId, title: m[0], status: 'upcoming', sort_order: i + 1 });
+    db.prepare(`INSERT INTO milestones (id, project_id, title, description, status, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'upcoming', ?, datetime('now'), datetime('now'))`)
+      .run(msId, projectId, m[0], m[1], i + 1);
+  });
+
+  logActivity(db, { projectId, action: 'project_created', entityType: 'project', entityId: projectId,
+    details: { created_via: 'seed_endpoint', phases_completed: 26 } });
+
+  // Return everything needed for .portal.json
+  res.json({
+    success: true,
+    data: {
+      org_id: orgId,
+      project_id: projectId,
+      portal_json: {
+        project_id: projectId,
+        project_name: 'Passaic Clifton Gemach',
+        org_name: 'Passaic Clifton Gemach',
+        status: 'maintenance',
+        progress_percent: 100,
+        milestones: msIds.map(m => ({ id: m.id, title: m.title, status: m.status, sort_order: m.sort_order, completion_notes: null })),
+        last_synced: new Date().toISOString()
+      }
+    }
+  });
+});
+
 module.exports = router;
