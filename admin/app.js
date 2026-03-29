@@ -1886,12 +1886,12 @@
           if (!el) continue;
           el.innerHTML = users.length === 0 ? 'No portal users yet.' :
             `<table style="width:100%;font-size:13px"><thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Email</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Name</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Status</th><th style="padding:6px 8px;border-bottom:1px solid var(--border)"></th></tr></thead><tbody>${users.map(u => `<tr>
-              <td style="padding:6px 8px">${escapeHtml(u.email)}</td>
+              <td style="padding:6px 8px">${escapeHtml(u.email)}${u.is_cross_org ? ' <span class="badge badge-blue" style="font-size:10px">cross-org</span>' : ''}</td>
               <td style="padding:6px 8px">${escapeHtml(u.name || '-')}</td>
               <td style="padding:6px 8px">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
               <td style="padding:6px 8px;text-align:right;white-space:nowrap">
                 <button class="btn btn-secondary btn-sm client-reset-pw" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}" style="margin-right:4px">Reset PW</button>
-                <button class="btn btn-danger btn-sm client-delete-user" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}">Remove</button>
+                <button class="btn btn-danger btn-sm client-delete-user" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}" data-cross-org="${u.is_cross_org ? 1 : 0}">Remove</button>
               </td>
             </tr>`).join('')}</tbody></table>`;
         } catch(e) {}
@@ -1932,7 +1932,11 @@
 
       // Delete client user
       $$('.client-delete-user').forEach(btn => btn.addEventListener('click', async () => {
-        if (!confirm(`Remove ${btn.dataset.email} from this organization? This cannot be undone.`)) return;
+        const isCrossOrg = btn.dataset.crossOrg === '1';
+        const msg = isCrossOrg
+          ? `Remove ${btn.dataset.email}'s cross-org access to this organization's projects?`
+          : `Remove ${btn.dataset.email} from this organization? This cannot be undone.`;
+        if (!confirm(msg)) return;
         try {
           await api(`/admin/clients/${btn.dataset.orgId}/users/${btn.dataset.userId}`, { method: 'DELETE' });
           renderClients();

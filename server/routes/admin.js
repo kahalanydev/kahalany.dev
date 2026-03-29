@@ -287,10 +287,25 @@ router.post('/clients/:orgId/users', (req, res) => {
   const existing = db.prepare('SELECT id, role, org_id FROM users WHERE email = ?').get(email.toLowerCase().trim());
 
   if (existing) {
-    // If user exists but isn't linked to an org yet (e.g. admin/staff), link them
-    if (existing.org_id) {
-      return res.status(409).json({ success: false, error: 'User already belongs to an organization' });
+    if (existing.org_id && existing.org_id === org.id) {
+      return res.status(409).json({ success: false, error: 'User already belongs to this organization' });
     }
+    // User belongs to a different org — add as cross-org member to all projects in this org
+    if (existing.org_id) {
+      const projects = db.prepare('SELECT id FROM projects WHERE org_id = ?').all(org.id);
+      let added = 0;
+      for (const p of projects) {
+        const already = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(p.id, existing.id);
+        if (!already) {
+          db.prepare('INSERT INTO project_members (project_id, user_id, added_by) VALUES (?, ?, ?)').run(p.id, existing.id, req.user.id);
+          added++;
+        }
+      }
+      logActivity(db, { userId: req.user.id, action: 'cross_org_member_added', entityType: 'user', entityId: String(existing.id),
+        details: { email, org_name: org.name, projects_added: added }, ip: req.ip });
+      return res.json({ success: true, data: { user: { id: existing.id, email, name: existing.name }, linked: true, message: `Added as cross-org member to ${added} project${added !== 1 ? 's' : ''} in ${org.name}` } });
+    }
+    // User exists but no org (e.g. admin/staff) — link them directly
     db.prepare('UPDATE users SET org_id = ? WHERE id = ?').run(org.id, existing.id);
     logActivity(db, { userId: req.user.id, action: 'user_linked_to_org', entityType: 'user', entityId: String(existing.id),
       details: { email, org_name: org.name, role: existing.role }, ip: req.ip });
@@ -316,27 +331,47 @@ router.post('/clients/:orgId/users', (req, res) => {
   res.json({ success: true, data: { user: { id: result.lastInsertRowid, email, name }, invite_url: inviteUrl } });
 });
 
-// GET /api/admin/clients/:orgId/users — list client users for org
+// GET /api/admin/clients/:orgId/users — list org users + cross-org members
 router.get('/clients/:orgId/users', (req, res) => {
   const db = getDb();
-  const users = db.prepare('SELECT id, email, name, role, must_change_password, last_login_at, created_at FROM users WHERE org_id = ? ORDER BY created_at')
-    .all(req.params.orgId);
+  const users = db.prepare(`
+    SELECT DISTINCT u.id, u.email, u.name, u.role, u.must_change_password, u.last_login_at, u.created_at,
+           CASE WHEN u.org_id = ? THEN 0 ELSE 1 END as is_cross_org
+    FROM users u
+    LEFT JOIN project_members pm ON pm.user_id = u.id
+    LEFT JOIN projects p ON p.id = pm.project_id AND p.org_id = ?
+    WHERE u.org_id = ? OR p.id IS NOT NULL
+    ORDER BY is_cross_org, u.created_at
+  `).all(req.params.orgId, req.params.orgId, req.params.orgId);
   res.json({ success: true, data: { users } });
 });
 
-// DELETE /api/admin/clients/:orgId/users/:userId — remove client user
+// DELETE /api/admin/clients/:orgId/users/:userId — remove client user or cross-org member
 router.delete('/clients/:orgId/users/:userId', (req, res) => {
   const db = getDb();
-  const user = db.prepare('SELECT * FROM users WHERE id = ? AND org_id = ?').get(parseInt(req.params.userId), req.params.orgId);
-  if (!user) return res.status(404).json({ success: false, error: 'User not found in this organization' });
+  const userId = parseInt(req.params.userId);
+  const orgId = req.params.orgId;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-  db.prepare('DELETE FROM project_members WHERE user_id = ?').run(user.id);
-  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+  if (user.org_id === orgId) {
+    // Direct org member — delete user entirely
+    db.prepare('DELETE FROM project_members WHERE user_id = ?').run(user.id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+    logActivity(db, { userId: req.user.id, action: 'client_user_deleted', entityType: 'user', entityId: String(user.id),
+      details: { email: user.email, org_id: orgId }, ip: req.ip });
+    return res.json({ success: true, data: { message: 'User removed' } });
+  }
 
-  logActivity(db, { userId: req.user.id, action: 'client_user_deleted', entityType: 'user', entityId: String(user.id),
-    details: { email: user.email, org_id: req.params.orgId }, ip: req.ip });
+  // Cross-org member — only remove project_members for this org's projects
+  const removed = db.prepare(`
+    DELETE FROM project_members WHERE user_id = ? AND project_id IN (SELECT id FROM projects WHERE org_id = ?)
+  `).run(userId, orgId);
+  if (removed.changes === 0) return res.status(404).json({ success: false, error: 'User not found in this organization' });
 
-  res.json({ success: true, data: { message: 'User removed' } });
+  logActivity(db, { userId: req.user.id, action: 'cross_org_member_removed', entityType: 'user', entityId: String(user.id),
+    details: { email: user.email, org_id: orgId, projects_removed: removed.changes }, ip: req.ip });
+  res.json({ success: true, data: { message: 'Cross-org access removed' } });
 });
 
 // ===== PROJECTS =====
