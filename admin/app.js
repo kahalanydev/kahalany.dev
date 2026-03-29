@@ -121,13 +121,37 @@
   }
 
   // ===== RENDER: LOGIN =====
-  function renderLogin() {
+  async function renderLogin() {
+    // Check if Google OAuth is enabled
+    let googleEnabled = false;
+    try {
+      const oauthStatus = await fetch('/api/auth/oauth/status').then(r => r.json());
+      googleEnabled = oauthStatus.data?.google_enabled;
+    } catch {}
+
+    // Check for OAuth error in URL hash
+    const hashParams = new URLSearchParams(window.location.hash.replace('#/login', '').replace('?', ''));
+    const oauthError = hashParams.get('error');
+    const errorMessages = {
+      oauth_denied: 'Google sign-in was cancelled',
+      invalid_state: 'Invalid OAuth state. Please try again',
+      use_portal: 'Client accounts should use the client portal',
+      server_error: 'Server error during sign-in. Please try again'
+    };
+
     app.innerHTML = `
       <div class="login-page">
         <div class="login-card">
           <div class="login-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
           <h2 class="login-title">Admin Login</h2>
-          <div id="loginMsg"></div>
+          <div id="loginMsg">${oauthError ? `<div class="alert alert-error">${escapeHtml(errorMessages[oauthError] || 'Sign-in failed')}</div>` : ''}</div>
+          ${googleEnabled ? `
+            <a href="/api/auth/google?target=admin" class="btn btn-google" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px;margin-bottom:16px;background:#fff;color:#333;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;font-weight:500;text-decoration:none;cursor:pointer;transition:background 0.2s">
+              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+              Sign in with Google
+            </a>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;color:var(--text-dim);font-size:13px"><div style="flex:1;height:1px;background:var(--border)"></div>or<div style="flex:1;height:1px;background:var(--border)"></div></div>
+          ` : ''}
           <form id="loginForm">
             <div class="form-group">
               <label>Email</label>
@@ -698,13 +722,17 @@
     `);
 
     try {
-      const usersRes = await api('/auth/users');
+      const [usersRes, oauthRes] = await Promise.all([
+        api('/auth/users'),
+        api('/auth/oauth/config')
+      ]);
       const users = usersRes.data.users;
+      const oauth = oauthRes.data;
 
       $('#mainContent').innerHTML = `
         <div class="page-header">
           <h1>Settings</h1>
-          <p>Manage your account and other administrators</p>
+          <p>Manage your account, administrators, and integrations</p>
         </div>
 
         <div class="grid-2">
@@ -756,6 +784,34 @@
               <div id="newUserResult" style="margin-top:12px"></div>
             </div>
           </div>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header"><span class="card-title">Google OAuth</span></div>
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+            Allow clients (and admins) to sign in with their Google account. Users must be created first — Google login only works for existing accounts.
+          </p>
+          <div id="oauthMsg"></div>
+          <form id="oauthForm">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+              <div class="form-group" style="margin-bottom:0">
+                <label>Google Client ID</label>
+                <input type="text" id="oauthClientId" value="${escapeHtml(oauth.google_client_id)}" placeholder="xxxx.apps.googleusercontent.com" style="font-family:var(--mono);font-size:12px">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label>Client Secret ${oauth.google_client_secret_set ? '<span class="badge badge-green" style="margin-left:6px;font-size:10px">set</span>' : '<span class="badge badge-gray" style="margin-left:6px;font-size:10px">not set</span>'}</label>
+                <input type="password" id="oauthClientSecret" placeholder="${oauth.google_client_secret_set ? 'Leave blank to keep current' : 'Enter client secret'}" style="font-family:var(--mono);font-size:12px">
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+                <input type="checkbox" id="oauthEnabled" ${oauth.google_oauth_enabled ? 'checked' : ''} style="width:auto">
+                Enable Google Sign-In
+              </label>
+              <button type="submit" class="btn btn-primary" style="width:auto">Save OAuth Settings</button>
+            </div>
+          </form>
+          ${oauth.google_oauth_enabled ? '<div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:var(--radius);font-size:12px;color:var(--text-dim)"><strong>Authorized redirect URI</strong> (add this in Google Cloud Console):<br><code style="color:var(--accent);font-family:var(--mono)">' + window.location.origin + '/api/auth/google/callback</code></div>' : ''}
         </div>
       `;
 
@@ -822,6 +878,28 @@
           $('#usersMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
       }));
+
+      // OAuth settings handler
+      $('#oauthForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const payload = {
+            google_client_id: $('#oauthClientId').value,
+            google_oauth_enabled: $('#oauthEnabled').checked
+          };
+          const secret = $('#oauthClientSecret').value;
+          if (secret) payload.google_client_secret = secret;
+
+          await api('/auth/oauth/config', {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+          $('#oauthMsg').innerHTML = `<div class="alert alert-success">OAuth settings saved</div>`;
+          setTimeout(() => renderSettings(), 1500);
+        } catch (err) {
+          $('#oauthMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      });
     } catch (err) {
       $('#mainContent').innerHTML = `<div class="alert alert-error">Failed to load settings: ${escapeHtml(err.message)}</div>`;
     }

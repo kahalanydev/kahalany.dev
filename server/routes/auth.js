@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { getDb, getJwtSecret } = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -167,6 +167,218 @@ router.delete('/users/:id', requireAuth, (req, res) => {
 
   db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
   res.json({ success: true, data: { message: 'User deleted' } });
+});
+
+// ===== OAUTH CONFIG (admin only) =====
+
+// GET /api/auth/oauth/config — get current OAuth settings (redacted secret)
+router.get('/oauth/config', requireAuth, requireRole('admin'), (req, res) => {
+  const db = getDb();
+  const clientId = db.prepare("SELECT value FROM config WHERE key = 'google_client_id'").get();
+  const clientSecret = db.prepare("SELECT value FROM config WHERE key = 'google_client_secret'").get();
+  const enabled = db.prepare("SELECT value FROM config WHERE key = 'google_oauth_enabled'").get();
+
+  res.json({
+    success: true,
+    data: {
+      google_client_id: clientId ? clientId.value : '',
+      google_client_secret_set: !!(clientSecret && clientSecret.value),
+      google_oauth_enabled: enabled ? enabled.value === '1' : false
+    }
+  });
+});
+
+// PUT /api/auth/oauth/config — update OAuth settings
+router.put('/oauth/config', requireAuth, requireRole('admin'), (req, res) => {
+  const { google_client_id, google_client_secret, google_oauth_enabled } = req.body;
+  const db = getDb();
+
+  if (google_client_id !== undefined) {
+    const existing = db.prepare("SELECT value FROM config WHERE key = 'google_client_id'").get();
+    if (existing) {
+      db.prepare("UPDATE config SET value = ? WHERE key = 'google_client_id'").run(google_client_id.trim());
+    } else {
+      db.prepare("INSERT INTO config (key, value) VALUES ('google_client_id', ?)").run(google_client_id.trim());
+    }
+  }
+
+  if (google_client_secret !== undefined && google_client_secret !== '') {
+    const existing = db.prepare("SELECT value FROM config WHERE key = 'google_client_secret'").get();
+    if (existing) {
+      db.prepare("UPDATE config SET value = ? WHERE key = 'google_client_secret'").run(google_client_secret.trim());
+    } else {
+      db.prepare("INSERT INTO config (key, value) VALUES ('google_client_secret', ?)").run(google_client_secret.trim());
+    }
+  }
+
+  if (google_oauth_enabled !== undefined) {
+    const val = google_oauth_enabled ? '1' : '0';
+    const existing = db.prepare("SELECT value FROM config WHERE key = 'google_oauth_enabled'").get();
+    if (existing) {
+      db.prepare("UPDATE config SET value = ? WHERE key = 'google_oauth_enabled'").run(val);
+    } else {
+      db.prepare("INSERT INTO config (key, value) VALUES ('google_oauth_enabled', ?)").run(val);
+    }
+  }
+
+  res.json({ success: true, data: { message: 'OAuth settings updated' } });
+});
+
+// ===== GOOGLE OAUTH FLOW =====
+
+// In-memory state tokens (short-lived, 5 min TTL)
+const oauthStates = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of oauthStates) {
+    if (now - val.created > 300000) oauthStates.delete(key);
+  }
+}, 60000);
+
+// Helper: get OAuth config from DB
+function getOAuthConfig() {
+  const db = getDb();
+  const clientId = db.prepare("SELECT value FROM config WHERE key = 'google_client_id'").get();
+  const clientSecret = db.prepare("SELECT value FROM config WHERE key = 'google_client_secret'").get();
+  const enabled = db.prepare("SELECT value FROM config WHERE key = 'google_oauth_enabled'").get();
+
+  if (!enabled || enabled.value !== '1' || !clientId || !clientSecret) return null;
+  return { clientId: clientId.value, clientSecret: clientSecret.value };
+}
+
+// GET /api/auth/oauth/status — public endpoint, tells frontend if Google OAuth is available
+router.get('/oauth/status', (req, res) => {
+  const config = getOAuthConfig();
+  res.json({ success: true, data: { google_enabled: !!config } });
+});
+
+// GET /api/auth/google — initiate Google OAuth flow
+router.get('/google', (req, res) => {
+  const config = getOAuthConfig();
+  if (!config) return res.status(400).json({ success: false, error: 'Google OAuth not configured' });
+
+  const target = req.query.target || 'portal'; // 'portal' or 'admin'
+  if (!['portal', 'admin'].includes(target)) {
+    return res.status(400).json({ success: false, error: 'Invalid target' });
+  }
+
+  const state = crypto.randomBytes(32).toString('hex');
+  oauthStates.set(state, { created: Date.now(), target });
+
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const redirectUri = `${proto}://${host}/api/auth/google/callback`;
+
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state: state,
+    access_type: 'online',
+    prompt: 'select_account'
+  });
+
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+// GET /api/auth/google/callback — Google redirects here
+router.get('/google/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+
+  if (error) {
+    return res.redirect('/portal#/login?error=oauth_denied');
+  }
+
+  if (!state || !oauthStates.has(state)) {
+    return res.redirect('/portal#/login?error=invalid_state');
+  }
+
+  const stateData = oauthStates.get(state);
+  oauthStates.delete(state);
+  const target = stateData.target;
+
+  const config = getOAuthConfig();
+  if (!config) {
+    return res.redirect(`/${target}#/login?error=oauth_not_configured`);
+  }
+
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const redirectUri = `${proto}://${host}/api/auth/google/callback`;
+
+  try {
+    // Exchange code for tokens
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code'
+      })
+    });
+
+    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok || !tokenData.access_token) {
+      console.error('OAuth token exchange failed:', tokenData);
+      return res.redirect(`/${target}#/login?error=token_exchange_failed`);
+    }
+
+    // Get user info from Google
+    const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+
+    const userInfo = await userInfoRes.json();
+    if (!userInfoRes.ok || !userInfo.email) {
+      return res.redirect(`/${target}#/login?error=userinfo_failed`);
+    }
+
+    // Look up user by email
+    const db = getDb();
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(userInfo.email.toLowerCase());
+
+    if (!user) {
+      return res.redirect(`/${target}#/login?error=no_account`);
+    }
+
+    // Verify role matches target
+    if (target === 'portal' && user.role !== 'client') {
+      return res.redirect('/admin#/login?error=use_admin');
+    }
+    if (target === 'admin' && !['admin', 'staff'].includes(user.role)) {
+      return res.redirect('/portal#/login?error=use_portal');
+    }
+
+    // Update user's Google info if not already linked
+    const safeAlter = (sql) => { try { db._db.run(sql); } catch(e) {} };
+    safeAlter('ALTER TABLE users ADD COLUMN google_id TEXT');
+    safeAlter('ALTER TABLE users ADD COLUMN avatar_url TEXT');
+
+    if (userInfo.id) {
+      db.prepare("UPDATE users SET google_id = ?, avatar_url = ?, last_login_at = datetime('now') WHERE id = ?")
+        .run(userInfo.id, userInfo.picture || null, user.id);
+    }
+
+    // Issue JWT
+    const token = jwt.sign({ userId: user.id }, getJwtSecret(), { expiresIn: '24h' });
+
+    // Redirect to frontend with token
+    const tokenKey = target === 'portal' ? 'portal_token' : 'admin_token';
+    res.send(`<!DOCTYPE html><html><head><title>Signing in...</title></head><body>
+      <script>
+        localStorage.setItem('${tokenKey}', '${token}');
+        window.location.href = '/${target}';
+      </script>
+    </body></html>`);
+
+  } catch (err) {
+    console.error('OAuth callback error:', err);
+    res.redirect(`/${target}#/login?error=server_error`);
+  }
 });
 
 module.exports = router;

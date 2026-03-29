@@ -369,6 +369,8 @@ function initSchema() {
   safeAlter('ALTER TABLE users ADD COLUMN login_attempts INTEGER DEFAULT 0');
   safeAlter('ALTER TABLE users ADD COLUMN locked_until TEXT');
   safeAlter('ALTER TABLE users ADD COLUMN last_login_at TEXT');
+  safeAlter('ALTER TABLE users ADD COLUMN google_id TEXT');
+  safeAlter('ALTER TABLE users ADD COLUMN avatar_url TEXT');
 }
 
 function getJwtSecret() {
