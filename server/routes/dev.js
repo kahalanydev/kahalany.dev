@@ -316,8 +316,8 @@ router.post('/seed-pcg', (req, res) => {
   milestones.forEach((m, i) => {
     const msId = generateId();
     msIds.push({ id: msId, title: m[0], status: 'upcoming', sort_order: i + 1 });
-    db.prepare(`INSERT INTO milestones (id, project_id, title, description, status, sort_order, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'upcoming', ?, datetime('now'), datetime('now'))`)
+    db.prepare(`INSERT INTO milestones (id, project_id, title, description, status, sort_order, created_at)
+      VALUES (?, ?, ?, ?, 'upcoming', ?, datetime('now'))`)
       .run(msId, projectId, m[0], m[1], i + 1);
   });
 
