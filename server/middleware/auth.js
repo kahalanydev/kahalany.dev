@@ -84,6 +84,21 @@ function requireDevAuth(req, res, next) {
   const payload = `${req.method}\n${req.originalUrl}\n${timestamp}\n${bodyHash}`;
   const expected = crypto.createHmac('sha256', key.secret).update(payload).digest('hex');
 
+  // DEBUG: log signature components (remove after diagnosing)
+  console.log('[DevAuth DEBUG]', JSON.stringify({
+    method: req.method,
+    originalUrl: req.originalUrl,
+    path: req.path,
+    baseUrl: req.baseUrl,
+    timestamp,
+    bodyStr,
+    bodyHash: bodyHash.slice(0, 12) + '...',
+    payload: payload.replace(/\n/g, '\\n'),
+    expected: expected.slice(0, 12) + '...',
+    received: signature.slice(0, 12) + '...',
+    match: expected === signature
+  }));
+
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) {
     return res.status(401).json({ success: false, error: 'Invalid signature' });
   }
