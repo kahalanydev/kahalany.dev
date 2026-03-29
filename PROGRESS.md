@@ -363,6 +363,42 @@ Generates project-specific `CLAUDE.md` with:
 
 ---
 
+## 2026-03-29 — Project Plans & Approval Flow (Phase 3)
+
+### Plan Versioning
+- New `plan_versions` table stores complete history of every plan edit
+- On every save, the current plan content is archived before being overwritten
+- Admin endpoints: `GET /plan/versions` (list), `GET /plan/versions/:id` (detail), `POST /plan/restore/:id` (restore)
+- Restoring a version saves the current plan as a new version first, then replaces content
+
+### Markdown Rendering
+- Lightweight regex-based markdown renderer (no dependencies)
+- Supports: headings (h1-h4), bold, italic, code blocks, inline code, lists (ordered/unordered), checkboxes, links, horizontal rules
+- Admin plan editor has Write/Preview tabs with live markdown preview
+- Portal plan view renders markdown (was previously raw text)
+
+### Approval Workflow Polish
+- Portal plan page now shows "Approve Project" and "Request Changes" side by side
+- "Request Changes" opens inline feedback form that creates a ticket (type: `modification`) for the team
+- Plan nav item added to portal sidebar for easy access
+- Admin can re-propose plans after making changes ("Re-send to Client")
+- Save button shows inline version badge feedback (`Saved (v3)`) without page reload
+- Admin version history panel: view any previous version, restore with one click
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/db.js` | Added `plan_versions` table |
+| `server/routes/admin.js` | Version history, view, restore endpoints; versioned save |
+| `admin/app.js` | Markdown renderer, Write/Preview tabs, version history panel |
+| `portal/app.js` | Markdown renderer, "Request Changes" feedback form, Plan nav item |
+
+### Remaining Phases
+- **Phase 4**: File Uploads & Polish (Multer, email notifications, mobile)
+- **Phase 5**: PCG Pilot (real client onboarding)
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [ ] Add more contact methods (phone, WhatsApp, Calendly)
