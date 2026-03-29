@@ -1885,7 +1885,15 @@
           const el = $(`#usersList-${o.id}`);
           if (!el) continue;
           el.innerHTML = users.length === 0 ? 'No portal users yet.' :
-            users.map(u => `<div style="padding:4px 0">${escapeHtml(u.email)} ${u.name ? '('+escapeHtml(u.name)+')' : ''} ${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</div>`).join('');
+            `<table style="width:100%;font-size:13px"><thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Email</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Name</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Status</th><th style="padding:6px 8px;border-bottom:1px solid var(--border)"></th></tr></thead><tbody>${users.map(u => `<tr>
+              <td style="padding:6px 8px">${escapeHtml(u.email)}</td>
+              <td style="padding:6px 8px">${escapeHtml(u.name || '-')}</td>
+              <td style="padding:6px 8px">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
+              <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+                <button class="btn btn-secondary btn-sm client-reset-pw" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}" style="margin-right:4px">Reset PW</button>
+                <button class="btn btn-danger btn-sm client-delete-user" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}">Remove</button>
+              </td>
+            </tr>`).join('')}</tbody></table>`;
         } catch(e) {}
       }
 
@@ -1909,6 +1917,26 @@
             : `<div class="alert alert-success">Created! Invite link sent via email.<br><small>Or share directly:</small><br><input type="text" value="${escapeHtml(res.data.invite_url)}" readonly onclick="this.select()" style="width:100%;margin-top:8px;padding:8px;font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)"></div>`;
           setTimeout(() => renderClients(), 3000);
         } catch (err) { result.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
+      }));
+
+      // Reset client user password
+      $$('.client-reset-pw').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm(`Reset password for ${btn.dataset.email}?`)) return;
+        try {
+          const res = await api(`/auth/users/${btn.dataset.userId}/reset`, { method: 'POST' });
+          const row = btn.closest('td');
+          row.innerHTML = `<input type="text" value="${escapeHtml(res.data.invite_url)}" readonly onclick="this.select()" style="width:220px;padding:4px 8px;font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">`;
+          setTimeout(() => renderClients(), 5000);
+        } catch (err) { alert(err.message); }
+      }));
+
+      // Delete client user
+      $$('.client-delete-user').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm(`Remove ${btn.dataset.email} from this organization? This cannot be undone.`)) return;
+        try {
+          await api(`/admin/clients/${btn.dataset.orgId}/users/${btn.dataset.userId}`, { method: 'DELETE' });
+          renderClients();
+        } catch (err) { alert(err.message); }
       }));
     } catch (err) {
       $('#mainContent').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;

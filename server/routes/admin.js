@@ -324,6 +324,21 @@ router.get('/clients/:orgId/users', (req, res) => {
   res.json({ success: true, data: { users } });
 });
 
+// DELETE /api/admin/clients/:orgId/users/:userId — remove client user
+router.delete('/clients/:orgId/users/:userId', (req, res) => {
+  const db = getDb();
+  const user = db.prepare('SELECT * FROM users WHERE id = ? AND org_id = ?').get(parseInt(req.params.userId), req.params.orgId);
+  if (!user) return res.status(404).json({ success: false, error: 'User not found in this organization' });
+
+  db.prepare('DELETE FROM project_members WHERE user_id = ?').run(user.id);
+  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+
+  logActivity(db, { userId: req.user.id, action: 'client_user_deleted', entityType: 'user', entityId: String(user.id),
+    details: { email: user.email, org_id: req.params.orgId }, ip: req.ip });
+
+  res.json({ success: true, data: { message: 'User removed' } });
+});
+
 // ===== PROJECTS =====
 
 // GET /api/admin/projects — all projects
