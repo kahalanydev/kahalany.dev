@@ -66,10 +66,6 @@ app.post('/api/contact', async (req, res) => {
 
   const { getDb } = require('./db');
   const db = getDb();
-  const safeAlter = (sql) => { try { db._db.run(sql); } catch(e) {} };
-  safeAlter('ALTER TABLE contact_submissions ADD COLUMN project_name TEXT');
-  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_at TEXT');
-  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_org_id TEXT');
 
   db.prepare('INSERT INTO contact_submissions (name, email, message, project_name, ip, created_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))')
     .run(name, email.trim(), message, project_name ? project_name.trim() : null, ip);

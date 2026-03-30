@@ -210,6 +210,12 @@ function initSchema() {
     );
   `);
 
+  // Migrate: add columns that may be missing on older DBs
+  const safeAlter = (sql) => { try { db._db.run(sql); } catch(e) {} };
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN project_name TEXT');
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_at TEXT');
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_org_id TEXT');
+
   db.run(`
     CREATE TABLE IF NOT EXISTS contact_dismissals (
       contact_id INTEGER PRIMARY KEY REFERENCES contact_submissions(id),
