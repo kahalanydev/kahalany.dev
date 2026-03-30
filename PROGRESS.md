@@ -638,6 +638,75 @@ Admin Panel (kahalany.dev)          Claude Code Server (code.kahalany.dev)
 
 ---
 
+## 2026-03-30 — Admin Dashboard Rebuild & Client Portal Visual Upgrade
+
+### Admin Dashboard — Command Center
+Replaced the visitor-only dashboard with a full business command center.
+
+- **Top metrics**: Active Projects, Open Tickets, Pending Approvals, New Leads (contact submissions), Visitors Today, This Month
+- **Needs Attention**: Aggregates urgent/high tickets, overdue milestones, and pending plan approvals into a single priority card. Each item is clickable. Shows green "all clear" when empty.
+- **Active Projects**: Compact rows with progress bars, status badges, open ticket counts
+- **Recent Activity**: Unified feed across all projects with user names and timestamps
+- **Recent Visitors**: Slimmed to 8 rows (moved Top Referrers to Analytics page)
+- **Contact Submissions**: Name, email, message preview with dismiss button
+- New `contact_dismissals` table to track dismissed contacts
+- New `POST /api/admin/contacts/:id/dismiss` endpoint
+
+### Admin Project Detail — Grid Layout
+Reorganized from stacked cards to side-by-side grids:
+- Row 1: Milestones | Claude Code
+- Row 2: Project Plan | Tickets
+- Row 3: Project Members | Recent Activity
+
+### Claude Code Chat Widget Fix
+- Limited history to last 20 messages (was loading entire conversation)
+- Fixed scroll: always starts at bottom of chat (latest messages visible)
+- Added `max-height: 350px` with proper overflow scroll
+- Removed `flex:1` inline style that caused unbounded widget growth
+
+### Markdown Renderer Rewrite
+Replaced regex-and-`<br>` approach with proper block parser for both admin and portal:
+- Emits semantic `<p>`, `<ul>`, `<ol>`, `<pre>` tags instead of `<br><br>` everywhere
+- Added `.md-rendered` CSS class with tight spacing for headings, lists, paragraphs, code blocks
+- Project plans now render as clean, compact documents
+
+### Client Portal — Visual Redesign
+
+#### Dashboard
+- **Hero project cards** with SVG circular progress rings (animated stroke)
+- Milestone dot indicators (green filled = done, gray = pending)
+- "Up next: [milestone name]" preview on each card
+- Countdown to target date or "X days overdue" warning in red
+- Smart welcome banner ("2 projects active, 1 awaiting your approval")
+- Activity feed upgraded with per-action-type icons
+
+#### Project View
+- **Phase indicator bar**: 6-step horizontal progress (Planning → Proposed → Approved → In Progress → Review → Completed) with checkmarks for completed phases, glowing blue dot for current
+- **SVG progress ring** (120px) alongside 4 stat cards: milestones done, open tickets, days active, days remaining
+- **Visual milestone timeline**: Vertical connected nodes:
+  - Green circle + checkmark = completed
+  - Pulsing blue circle (CSS animation) = in progress
+  - Hollow gray circle = upcoming
+  - Connector line is green up to current milestone, gray after
+- Activity feed with action-type icons
+
+#### Portal API Enrichment
+- Dashboard: milestones_total, milestones_done, next_milestone, days_remaining per project
+- Project detail: days_since_start, days_remaining
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/routes/admin.js` | Dashboard API rewrite (business metrics, attention items, contacts), dismiss endpoint |
+| `server/routes/portal.js` | Enriched dashboard + project detail responses |
+| `server/db.js` | Added `contact_dismissals` table |
+| `admin/app.js` | Dashboard command center, chat widget fixes, markdown rewrite, grid layout |
+| `admin/styles.css` | `.md-rendered` styles, `.dash-attention-row` hover, chat widget max-height |
+| `portal/app.js` | Hero cards, progress ring, phase indicator, timeline, markdown rewrite, activity icons |
+| `portal/styles.css` | Hero cards, progress ring, phase bar, timeline, stat cards, responsive rules, `.md-rendered` |
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [x] ~~Add more contact methods (phone, WhatsApp, Calendly)~~ — Added WhatsApp + contact form

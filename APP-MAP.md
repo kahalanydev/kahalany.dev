@@ -93,6 +93,7 @@ Client → Traefik (SSL) → Express (:8080)
 - **suspicious_activity** — flagged events (rate spikes, scanner paths, bot UAs)
 - **geo_cache** — IP geolocation cache (from ip-api.com)
 - **contact_submissions** — contact form entries (name, email, message, ip, created_at)
+- **contact_dismissals** — tracks which contact submissions have been dismissed by admin
 
 **Client Portal (new)**:
 - **organizations** — client companies
@@ -176,10 +177,13 @@ Client → Traefik (SSL) → Express (:8080)
 - Email/password form, JWT stored in localStorage
 - Force password change on first login
 
-### Dashboard
-- Metric cards: Active Now, Today, This Week, This Month, Avg Time, Total
-- Recent Visitors table (IP, location, browser, device, time)
-- Top Referrers table
+### Dashboard (Command Center)
+- **Top metrics row**: Active Projects, Open Tickets, Pending Approvals, New Leads, Visitors Today, This Month
+- **Needs Attention card**: Urgent/high tickets, overdue milestones, pending plan approvals — each clickable to detail page. Green "all clear" state when empty.
+- **Active Projects**: Progress bars, status badges, open ticket counts, clickable rows
+- **Recent Activity**: Unified feed across all projects with user names and timestamps
+- **Recent Visitors**: Slim 8-row table (IP, location, device, time) with link to Analytics
+- **Contact Submissions**: Name, email, message preview, dismiss button, "new" badge count
 
 ### Security
 - Alert banner for high-severity events
@@ -221,17 +225,26 @@ Client → Traefik (SSL) → Express (:8080)
 
 ### Login
 - Email/password form, JWT stored in localStorage as `portal_token`
-- Validates role === 'client', redirects admin/staff to /admin
+- Accepts client, admin, and staff roles (admin/staff can preview portal by adding themselves as project members)
 
 ### Dashboard
-- Project cards with progress bars and status badges
-- Recent activity feed across all org projects
-- Quick links to project details
+- Smart welcome banner with project summary ("2 projects active, 1 awaiting your approval")
+- **Hero project cards** with SVG circular progress rings (animated fill)
+- Milestone dot indicators (green = done, gray = pending) and "Up next: [milestone]" preview
+- Countdown to target date or "X days overdue" warning in red
+- Recent activity feed with per-action-type icons
 
 ### Project View
-- Milestone timeline with status indicators (upcoming, in_progress, completed)
-- Progress bar (auto-calculated from milestone completion)
-- Open ticket count, recent activity
+- **Phase indicator bar**: 6-step horizontal bar (Planning → Proposed → Approved → In Progress → Review → Completed) with checkmarks for passed phases, glowing blue for current
+- **SVG progress ring** (120px) with 4 stat cards: milestones done, open tickets, days active, days remaining
+- **Visual milestone timeline**: Vertical connected nodes with:
+  - Green circle + checkmark = completed
+  - Pulsing blue circle (CSS animation) = in progress
+  - Hollow gray circle = upcoming
+  - Green connector line up to current milestone, gray after
+  - Title, description, dates, completion notes per node
+- Ticket action buttons (View Tickets / Create Ticket)
+- Recent activity feed with action-type icons
 
 ### Plan View
 - Project plan content display
@@ -254,7 +267,7 @@ Client → Traefik (SSL) → Express (:8080)
 ### Projects Page
 - Project list with progress bars, status badges, org assignment
 - Create project form with org selection
-- Project detail: status management, milestone CRUD, plan editor, ticket list, activity log
+- Project detail in 3 grid rows: Milestones + Claude Code | Plan + Tickets | Members + Activity
 
 ### Clients Page
 - Organization list with user counts
