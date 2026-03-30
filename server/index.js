@@ -40,9 +40,16 @@ app.use('/package.json', (req, res) => res.status(404).end());
 app.use('/package-lock.json', (req, res) => res.status(404).end());
 app.use('/.dockerignore', (req, res) => res.status(404).end());
 
-// Contact form (public, rate-limited)
+// Contact form (public, rate-limited, honeypot-protected)
 const contactLimiter = {};
 app.post('/api/contact', async (req, res) => {
+  const { name, email, message, project_name, _hp, _t } = req.body;
+
+  // Honeypot: hidden field filled = bot
+  if (_hp) return res.json({ success: true }); // silent success to not tip off bots
+  // Timing: submitted in under 2 seconds = bot
+  if (typeof _t === 'number' && _t < 2000) return res.json({ success: true });
+
   const ip = req.ip || req.socket.remoteAddress;
   const now = Date.now();
   if (contactLimiter[ip] && now - contactLimiter[ip] < 60000) {
@@ -50,7 +57,6 @@ app.post('/api/contact', async (req, res) => {
   }
   contactLimiter[ip] = now;
 
-  const { name, email, message } = req.body;
   if (!name || !email || !message) {
     return res.status(400).json({ error: 'All fields are required' });
   }
@@ -60,18 +66,26 @@ app.post('/api/contact', async (req, res) => {
 
   const { getDb } = require('./db');
   const db = getDb();
-  db.prepare('INSERT INTO contact_submissions (name, email, message, ip, created_at) VALUES (?, ?, ?, ?, datetime(\'now\'))').run(name, email.trim(), message, ip);
+  const safeAlter = (sql) => { try { db._db.run(sql); } catch(e) {} };
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN project_name TEXT');
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_at TEXT');
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_org_id TEXT');
+
+  db.prepare('INSERT INTO contact_submissions (name, email, message, project_name, ip, created_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))')
+    .run(name, email.trim(), message, project_name ? project_name.trim() : null, ip);
 
   // Try to send email notification
   try {
     const { sendEmail } = require('./utils/email');
+    const projectLine = project_name ? `<p><strong>Project:</strong> ${project_name}</p>` : '';
     await sendEmail({
       to: 'hello@kahalany.dev',
-      subject: `New project inquiry from ${name}`,
+      subject: `New project inquiry from ${name}${project_name ? ` — ${project_name}` : ''}`,
       html: `<div style="font-family:sans-serif;padding:20px;background:#1a1a2e;color:#e0e0e0;border-radius:12px;max-width:500px">
         <h2 style="color:#3b82f6;margin-bottom:16px">New Project Inquiry</h2>
         <p><strong>Name:</strong> ${name}</p>
         <p><strong>Email:</strong> <a href="mailto:${email}" style="color:#3b82f6">${email}</a></p>
+        ${projectLine}
         <p><strong>Message:</strong></p>
         <div style="background:#0d0d1a;padding:16px;border-radius:8px;margin-top:8px;white-space:pre-wrap">${message}</div>
       </div>`

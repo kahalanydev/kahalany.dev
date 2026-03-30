@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- IDEA FORM ---
     const ideaForm = document.getElementById('ideaForm');
+    const _ft = Date.now();
     if (ideaForm) {
         ideaForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -125,7 +126,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({
                         name: document.getElementById('ideaName').value,
                         email: document.getElementById('ideaEmail').value,
-                        message: document.getElementById('ideaText').value
+                        project_name: document.getElementById('ideaProject').value,
+                        message: document.getElementById('ideaText').value,
+                        _hp: document.getElementById('ideaWebsite').value,
+                        _t: Date.now() - _ft
                     })
                 });
                 const data = await res.json();

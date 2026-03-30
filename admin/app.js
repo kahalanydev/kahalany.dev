@@ -783,14 +783,22 @@ if ('serviceWorker' in navigator) {
               ${d.unreadContacts > 0 ? `<span class="badge badge-green">${d.unreadContacts} new</span>` : ''}
             </div>
             ${d.recentContacts.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;padding:8px 0">No submissions yet.</p>' : `
-              <div style="max-height:320px;overflow-y:auto">
+              <div style="max-height:400px;overflow-y:auto">
                 ${d.recentContacts.map(c => `
                   <div style="padding:10px 0;border-bottom:1px solid var(--surface-3)" data-contact-id="${c.id}">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                      <div style="font-size:13px"><strong style="color:var(--text)">${escapeHtml(c.name)}</strong> <span style="color:var(--text-dim)">${escapeHtml(c.email)}</span></div>
-                      <div style="display:flex;align-items:center;gap:8px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;flex-wrap:wrap;gap:4px">
+                      <div style="font-size:13px;min-width:0">
+                        <strong style="color:var(--text)">${escapeHtml(c.name)}</strong>
+                        <span style="color:var(--text-dim)">${escapeHtml(c.email)}</span>
+                        ${c.project_name ? `<span class="badge badge-blue" style="font-size:10px;margin-left:4px">${escapeHtml(c.project_name)}</span>` : ''}
+                      </div>
+                      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
                         <span style="font-size:11px;color:var(--text-dim)">${timeAgo(c.created_at)}</span>
-                        <button class="btn btn-secondary btn-sm contact-dismiss" data-id="${c.id}" style="font-size:10px;padding:2px 8px">Dismiss</button>
+                        ${c.converted_at
+                          ? '<span class="badge badge-green" style="font-size:10px">Converted</span>'
+                          : `<button class="btn btn-primary btn-sm contact-convert" data-id="${c.id}" data-name="${escapeHtml(c.name).replace(/"/g, '&quot;')}" data-email="${escapeHtml(c.email).replace(/"/g, '&quot;')}" data-project="${escapeHtml(c.project_name || '').replace(/"/g, '&quot;')}" style="font-size:10px;padding:2px 8px">\u2192 Client</button>
+                            <button class="btn btn-secondary btn-sm contact-dismiss" data-id="${c.id}" style="font-size:10px;padding:2px 8px">Dismiss</button>`
+                        }
                       </div>
                     </div>
                     <div style="font-size:12px;color:var(--text-secondary);line-height:1.4">${escapeHtml(truncate(c.message, 120))}</div>
@@ -812,6 +820,35 @@ if ('serviceWorker' in navigator) {
           btn.disabled = true;
           btn.textContent = 'Dismissed';
         } catch {}
+      }));
+
+      // Convert contact to client
+      $$('.contact-convert').forEach(btn => btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const defaultProject = btn.dataset.project || '';
+        const projectName = prompt('Project name:', defaultProject || 'New Project');
+        if (projectName === null) return;
+        btn.disabled = true;
+        btn.textContent = 'Converting...';
+        try {
+          const res = await api(`/admin/contacts/${btn.dataset.id}/convert`, {
+            method: 'POST',
+            body: JSON.stringify({ project_name: projectName })
+          });
+          const row = btn.closest('[data-contact-id]');
+          const btns = row.querySelectorAll('.contact-convert, .contact-dismiss');
+          btns.forEach(b => b.remove());
+          const badge = document.createElement('span');
+          badge.className = 'badge badge-green';
+          badge.style.fontSize = '10px';
+          badge.textContent = 'Converted';
+          row.querySelector('div').lastElementChild.appendChild(badge);
+          alert(res.data.message + (res.data.invite_url ? '\n\nInvite: ' + res.data.invite_url : ''));
+        } catch (err) {
+          alert('Failed: ' + err.message);
+          btn.disabled = false;
+          btn.textContent = '\u2192 Client';
+        }
       }));
 
     } catch (err) {

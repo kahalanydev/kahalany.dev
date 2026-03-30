@@ -202,7 +202,10 @@ function initSchema() {
       name TEXT NOT NULL,
       email TEXT NOT NULL,
       message TEXT NOT NULL,
+      project_name TEXT,
       ip TEXT,
+      converted_at TEXT,
+      converted_org_id TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);

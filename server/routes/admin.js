@@ -58,7 +58,7 @@ router.get('/dashboard', (req, res) => {
   `).all();
 
   const recentContacts = db.prepare(`
-    SELECT cs.id, cs.name, cs.email, cs.message, cs.created_at
+    SELECT cs.id, cs.name, cs.email, cs.message, cs.project_name, cs.converted_at, cs.converted_org_id, cs.created_at
     FROM contact_submissions cs
     ORDER BY cs.created_at DESC
     LIMIT 10
@@ -107,6 +107,100 @@ router.post('/contacts/:id/dismiss', (req, res) => {
   const db = getDb();
   db.prepare('INSERT OR IGNORE INTO contact_dismissals (contact_id, dismissed_by) VALUES (?, ?)').run(req.params.id, req.user.id);
   res.json({ success: true });
+});
+
+// POST /api/admin/contacts/:id/convert — convert contact submission to client (org + project + portal user)
+router.post('/contacts/:id/convert', (req, res) => {
+  const db = getDb();
+  const contact = db.prepare('SELECT * FROM contact_submissions WHERE id = ?').get(req.params.id);
+  if (!contact) return res.status(404).json({ success: false, error: 'Contact not found' });
+  if (contact.converted_at) return res.status(400).json({ success: false, error: 'Already converted' });
+
+  const { project_name } = req.body;
+  const orgName = contact.name;
+  const email = contact.email.toLowerCase().trim();
+  const projName = (project_name || contact.project_name || 'New Project').trim();
+
+  // Create organization
+  const orgId = generateId();
+  db.prepare('INSERT INTO organizations (id, name, primary_email, notes) VALUES (?, ?, ?, ?)')
+    .run(orgId, orgName, email, `Converted from contact submission #${contact.id}`);
+
+  logActivity(db, { userId: req.user.id, action: 'org_created', entityType: 'organization', entityId: orgId,
+    details: { name: orgName, source: 'contact_conversion' }, ip: req.ip });
+
+  // Create project
+  const projectId = generateId();
+  let slug = slugify(projName);
+  const existingSlug = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug);
+  if (existingSlug) slug = `${slug}-${Date.now().toString(36)}`;
+
+  db.prepare('INSERT INTO projects (id, org_id, name, slug, description) VALUES (?, ?, ?, ?, ?)')
+    .run(projectId, orgId, projName, slug, contact.message);
+
+  logActivity(db, { projectId, userId: req.user.id, action: 'project_created', entityType: 'project', entityId: projectId,
+    details: { name: projName, org_name: orgName, source: 'contact_conversion' }, ip: req.ip });
+
+  // Create portal user with invite
+  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const placeholder = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 4);
+
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  let userId;
+  if (existing) {
+    userId = existing.id;
+    db.prepare('UPDATE users SET org_id = ? WHERE id = ? AND org_id IS NULL').run(orgId, userId);
+  } else {
+    const result = db.prepare(
+      'INSERT INTO users (email, password_hash, name, role, org_id, must_change_password, invite_token, invite_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(email, placeholder, contact.name, 'client', orgId, 1, inviteToken, inviteExpires);
+    userId = result.lastInsertRowid;
+  }
+
+  // Mark contact as converted
+  const safeAlter = (sql) => { try { db._db.run(sql); } catch(e) {} };
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_at TEXT');
+  safeAlter('ALTER TABLE contact_submissions ADD COLUMN converted_org_id TEXT');
+  db.prepare("UPDATE contact_submissions SET converted_at = datetime('now'), converted_org_id = ? WHERE id = ?").run(orgId, contact.id);
+
+  // Auto-dismiss
+  db.prepare('INSERT OR IGNORE INTO contact_dismissals (contact_id, dismissed_by) VALUES (?, ?)').run(contact.id, req.user.id);
+
+  // Send invite email
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const inviteUrl = existing ? null : `${proto}://${host}/portal#/invite/${inviteToken}`;
+
+  if (inviteUrl) {
+    try {
+      const { sendEmail, emailWrapper } = require('../utils/email');
+      sendEmail({
+        to: email,
+        subject: `You've been invited to the ${orgName} project portal`,
+        html: emailWrapper(`
+          <h2 style="color:#3b82f6;margin-bottom:16px">Welcome to Your Project Portal</h2>
+          <p>Hi ${contact.name},</p>
+          <p>Your project <strong>${projName}</strong> has been set up. Click below to create your password and access your portal.</p>
+          <div style="text-align:center;margin:24px 0">
+            <a href="${inviteUrl}" style="background:#3b82f6;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600">Set Up Your Account</a>
+          </div>
+          <p style="font-size:12px;color:#888">This link expires in 7 days.</p>
+        `)
+      }).catch(() => {});
+    } catch {}
+  }
+
+  res.json({
+    success: true,
+    data: {
+      org_id: orgId,
+      project_id: projectId,
+      user_id: userId,
+      invite_url: inviteUrl,
+      message: `Created org "${orgName}", project "${projName}"${inviteUrl ? ', and sent portal invite' : ' (user already exists)'}`
+    }
+  });
 });
 
 // GET /api/admin/security
