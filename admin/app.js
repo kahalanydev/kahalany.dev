@@ -1,4 +1,8 @@
 /* Admin Panel SPA — kahalany.dev */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/admin/sw.js').catch(() => {});
+}
+
 (function () {
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
@@ -531,10 +535,16 @@
       { id: 'analytics', icon: '\u25CE', label: 'Analytics' },
       { id: 'settings', icon: '\u2699', label: 'Settings' },
     ];
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const bottomNavItems = navItems.filter(n => n.id !== 'settings');
     app.innerHTML = `
-      <button class="mobile-toggle" id="mobileToggle">\u2630</button>
+      <div class="mobile-top-bar" id="mobileTopBar">
+        <button class="mtb-btn" id="mtbTheme" title="Toggle theme">${isLight ? '\u2600' : '\u{1F319}'}</button>
+        <a href="#/settings" class="mtb-btn ${state.page === 'settings' ? 'active' : ''}" title="Settings">\u2699</a>
+        <button class="mtb-btn" id="mtbLogout" title="Logout">\u{1F6AA}</button>
+      </div>
       <div class="layout">
-        <aside class="sidebar ${state.sidebarOpen ? 'open' : ''}" id="sidebar">
+        <aside class="sidebar" id="sidebar">
           <div class="sidebar-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
           <div class="sidebar-label">Admin Panel</div>
           <ul class="sidebar-nav">
@@ -547,7 +557,7 @@
           <div class="sidebar-bottom">
             <div class="sidebar-user">${escapeHtml(state.user?.email)}</div>
             <div style="display:flex;gap:6px;margin-bottom:8px">
-              <button class="theme-toggle-btn" id="themeToggleAdmin" style="flex:1;justify-content:center">${document.documentElement.getAttribute('data-theme') === 'light' ? '\u2600 Light' : '\u{1F319} Dark'}</button>
+              <button class="theme-toggle-btn" id="themeToggleAdmin" style="flex:1;justify-content:center">${isLight ? '\u2600 Light' : '\u{1F319} Dark'}</button>
             </div>
             <button class="btn btn-secondary btn-sm" id="logoutBtn" style="width:100%">Logout</button>
           </div>
@@ -555,7 +565,7 @@
         <main class="main" id="mainContent">${content}</main>
       </div>
       <nav class="bottom-nav" id="bottomNav">
-        ${navItems.map(n => `
+        ${bottomNavItems.map(n => `
           <a href="#/${n.id}" class="bottom-nav-item ${state.page === n.id ? 'active' : ''}" data-page="${n.id}">
             <span class="bottom-nav-icon">${n.icon}</span>
             <span class="bottom-nav-label">${n.label}</span>
@@ -566,7 +576,6 @@
     // Nav handlers (sidebar + bottom nav)
     $$('.sidebar-nav a').forEach(a => a.addEventListener('click', (e) => {
       e.preventDefault();
-      state.sidebarOpen = false;
       window.location.hash = `/${a.dataset.page}`;
     }));
     $$('.bottom-nav-item').forEach(a => a.addEventListener('click', (e) => {
@@ -574,17 +583,22 @@
       window.location.hash = `/${a.dataset.page}`;
     }));
     $('#logoutBtn').addEventListener('click', logout);
-    const toggle = $('#mobileToggle');
-    if (toggle) toggle.addEventListener('click', () => {
-      state.sidebarOpen = !state.sidebarOpen;
-      $('#sidebar').classList.toggle('open', state.sidebarOpen);
+    const mtbLogout = $('#mtbLogout');
+    if (mtbLogout) mtbLogout.addEventListener('click', logout);
+    function applyTheme(goLight) {
+      if (goLight) { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('admin_theme', 'light'); }
+      else { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('admin_theme', 'dark'); }
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = goLight ? '#ffffff' : '#09090b';
+      render();
+    }
+    const mtbTheme = $('#mtbTheme');
+    if (mtbTheme) mtbTheme.addEventListener('click', () => {
+      applyTheme(document.documentElement.getAttribute('data-theme') !== 'light');
     });
     const themeBtn = $('#themeToggleAdmin');
     if (themeBtn) themeBtn.addEventListener('click', () => {
-      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      if (isLight) { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('admin_theme', 'dark'); }
-      else { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('admin_theme', 'light'); }
-      render();
+      applyTheme(document.documentElement.getAttribute('data-theme') !== 'light');
     });
   }
 
@@ -2789,12 +2803,12 @@
 
         ${orgs.length === 0 ? '<div class="empty-state"><p>No clients yet. Create one to get started!</p></div>' :
           orgs.map(o => `
-            <div class="card" style="margin-bottom:16px">
-              <div class="card-header">
-                <span class="card-title">${escapeHtml(o.name)}</span>
-                <span style="font-size:12px;color:var(--text-dim)">${escapeHtml(o.primary_email)}</span>
+            <div class="card client-card" style="margin-bottom:16px;overflow:hidden">
+              <div class="card-header" style="flex-wrap:wrap;gap:4px 12px">
+                <span class="card-title" style="word-break:break-word">${escapeHtml(o.name)}</span>
+                <span style="font-size:12px;color:var(--text-dim);word-break:break-all;min-width:0">${escapeHtml(o.primary_email)}</span>
               </div>
-              <div style="display:flex;gap:24px;font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:13px;color:var(--text-secondary);margin-bottom:16px">
                 <span>${o.project_count} project${o.project_count!==1?'s':''}</span>
                 <span>${o.user_count} portal user${o.user_count!==1?'s':''}</span>
                 <span>Created ${timeAgo(o.created_at)}</span>
@@ -2805,10 +2819,10 @@
                   <button class="btn btn-secondary btn-sm add-user-btn" data-org-id="${o.id}">+ Add User</button>
                 </div>
                 <div id="addUserForm-${o.id}" style="display:none;margin-bottom:12px">
-                  <div style="display:flex;gap:8px">
-                    <input type="email" placeholder="Email" class="new-client-email" style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
-                    <input type="text" placeholder="Name" class="new-client-name" style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
-                    <button class="btn btn-primary btn-sm save-client-btn" data-org-id="${o.id}">Create</button>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <input type="email" placeholder="Email" class="new-client-email" style="flex:1;min-width:0;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;box-sizing:border-box">
+                    <input type="text" placeholder="Name" class="new-client-name" style="flex:1;min-width:0;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;box-sizing:border-box">
+                    <button class="btn btn-primary btn-sm save-client-btn" data-org-id="${o.id}" style="flex-shrink:0">Create</button>
                   </div>
                   <div class="new-client-result" style="margin-top:8px"></div>
                 </div>
@@ -2840,10 +2854,10 @@
           if (!el) continue;
           el.innerHTML = users.length === 0 ? 'No portal users yet.' :
             `<table class="mobile-cards" style="width:100%;font-size:13px"><thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Email</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Name</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Status</th><th style="padding:6px 8px;border-bottom:1px solid var(--border)"></th></tr></thead><tbody>${users.map(u => `<tr>
-              <td data-label="Email" style="padding:6px 8px">${escapeHtml(u.email)}${u.is_cross_org ? ' <span class="badge badge-blue" style="font-size:10px">cross-org</span>' : ''}</td>
+              <td data-label="Email" style="padding:6px 8px;word-break:break-all;min-width:0">${escapeHtml(u.email)}${u.is_cross_org ? ' <span class="badge badge-blue" style="font-size:10px">cross-org</span>' : ''}</td>
               <td data-label="Name" style="padding:6px 8px">${escapeHtml(u.name || '-')}</td>
               <td data-label="Status" style="padding:6px 8px">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
-              <td data-label="" style="padding:6px 8px;text-align:right;white-space:nowrap">
+              <td data-label="" style="padding:6px 8px;text-align:right">
                 <button class="btn btn-secondary btn-sm client-reset-pw" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}" style="margin-right:4px">Reset PW</button>
                 <button class="btn btn-danger btn-sm client-delete-user" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}" data-cross-org="${u.is_cross_org ? 1 : 0}">Remove</button>
               </td>

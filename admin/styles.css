@@ -1,4 +1,7 @@
 /* Admin Panel Styles — kahalany.dev */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+
 :root {
   --bg: #09090b;
   --surface: #18181b;
@@ -71,6 +74,8 @@ body {
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* ===== LOGIN PAGE ===== */
@@ -507,7 +512,10 @@ table td .mono {
 /* ===== BOTTOM NAV (hidden on desktop) ===== */
 .bottom-nav { display: none; }
 
-/* ===== MOBILE TOGGLE ===== */
+/* ===== MOBILE TOP BAR (hidden on desktop) ===== */
+.mobile-top-bar { display: none; }
+
+/* ===== MOBILE TOGGLE (legacy, hidden) ===== */
 .mobile-toggle {
   display: none;
   position: fixed;
@@ -529,19 +537,40 @@ table td .mono {
 }
 
 @media (max-width: 768px) {
-  .mobile-toggle { display: block; }
-
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.2s;
+  /* ===== MOBILE TOP BAR ===== */
+  .mobile-top-bar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 200;
+    gap: 2px;
+    padding: 10px 12px;
   }
+  .mtb-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .mtb-btn:hover, .mtb-btn.active { color: var(--accent); border-color: var(--accent-border); }
 
-  .sidebar.open { transform: translateX(0); }
+  .sidebar { display: none; }
 
   .main {
     margin-left: 0;
     padding: 24px 12px;
-    padding-top: 64px;
+    padding-top: 52px;
   }
 
   .metrics-grid {
@@ -605,7 +634,12 @@ table td .mono {
 
   /* Buttons in mobile card action cells stack if needed */
   .mobile-cards td[data-label=""] { flex-wrap: wrap; gap: 6px; }
-  .mobile-cards td[data-label=""] .btn-sm { font-size: 11px; padding: 5px 10px; }
+  .mobile-cards td[data-label=""] .btn-sm { font-size: 11px; padding: 5px 10px; white-space: nowrap; }
+
+  /* Client cards overflow fixes */
+  .client-card { overflow: hidden; }
+  .client-card .card-header { flex-direction: column; align-items: flex-start !important; }
+  .client-card input[type="email"], .client-card input[type="text"] { width: 100%; min-width: 0 !important; flex-basis: 100% !important; }
 
   /* Chart containers scale */
   .chart-container { height: 220px !important; }
@@ -652,15 +686,8 @@ table td .mono {
   /* Adjust main content for bottom nav */
   .main { padding-bottom: 70px !important; }
 
-  /* Keep hamburger as small "more" button for sidebar access (logout, theme) */
-  .mobile-toggle {
-    display: block;
-    top: 12px;
-    left: 12px;
-    padding: 6px 10px;
-    font-size: 16px;
-    opacity: 0.6;
-  }
+  /* Hamburger hidden on mobile — replaced by top bar + bottom nav */
+  .mobile-toggle { display: none !important; }
 }
 
 @media (max-width: 480px) {

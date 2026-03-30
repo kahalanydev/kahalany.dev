@@ -1,4 +1,7 @@
 /* Client Portal Styles — kahalany.dev */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+
 :root {
   --bg: #09090b;
   --surface: #18181b;
@@ -71,6 +74,8 @@ body {
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* ===== LOGIN ===== */
@@ -658,6 +663,9 @@ table tr:hover td { background: var(--surface-2); }
 /* ===== BOTTOM NAV (hidden on desktop) ===== */
 .bottom-nav { display: none; }
 
+/* ===== MOBILE TOP BAR (hidden on desktop) ===== */
+.mobile-top-bar { display: none; }
+
 /* ===== MOBILE ===== */
 .mobile-toggle {
   display: none;
@@ -675,10 +683,37 @@ table tr:hover td { background: var(--surface-2); }
 }
 
 @media (max-width: 768px) {
-  .mobile-toggle { display: block; }
-  .sidebar { transform: translateX(-100%); transition: transform 0.2s; }
-  .sidebar.open { transform: translateX(0); }
-  .main { margin-left: 0; padding: 24px 12px; padding-top: 64px; }
+  /* ===== MOBILE TOP BAR ===== */
+  .mobile-top-bar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 200;
+    gap: 2px;
+    padding: 10px 12px;
+  }
+  .mtb-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .mtb-btn:hover { color: var(--accent); border-color: var(--accent-border); }
+
+  .mobile-toggle { display: none !important; }
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 24px 12px; padding-top: 52px; }
   .form-row { flex-direction: column; }
   .hero-cards-grid { grid-template-columns: 1fr; }
   .project-overview-card { flex-direction: column; text-align: center; gap: 16px; }
@@ -788,15 +823,6 @@ table tr:hover td { background: var(--surface-2); }
   /* Adjust main content for bottom nav */
   .main { padding-bottom: 70px !important; }
 
-  /* Keep hamburger as small "more" button for sidebar access (logout, theme) */
-  .mobile-toggle {
-    display: block;
-    top: 12px;
-    left: 12px;
-    padding: 6px 10px;
-    font-size: 16px;
-    opacity: 0.6;
-  }
 }
 
 @media (max-width: 480px) {

@@ -1,4 +1,8 @@
 /* Client Portal SPA — kahalany.dev */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/portal/sw.js').catch(() => {});
+}
+
 (function () {
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
@@ -340,10 +344,14 @@
       bottomItems.push(...navItems);
     }
 
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
     app.innerHTML = `
-      <button class="mobile-toggle" id="mobileToggle">\u2630</button>
+      <div class="mobile-top-bar" id="mobileTopBar">
+        <button class="mtb-btn" id="mtbTheme" title="Toggle theme">${isLight ? '\u2600' : '\u{1F319}'}</button>
+        <button class="mtb-btn" id="mtbLogout" title="Logout">\u{1F6AA}</button>
+      </div>
       <div class="layout">
-        <aside class="sidebar ${state.sidebarOpen ? 'open' : ''}" id="sidebar">
+        <aside class="sidebar" id="sidebar">
           <div class="sidebar-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
           <div class="sidebar-label">Client Portal</div>
           <ul class="sidebar-nav">
@@ -359,7 +367,7 @@
           <div class="sidebar-bottom">
             <div class="sidebar-user">${escapeHtml(state.user?.name || state.user?.email)}</div>
             <div style="display:flex;gap:6px;margin-bottom:8px">
-              <button class="theme-toggle-btn" id="themeTogglePortal" style="flex:1;justify-content:center">${document.documentElement.getAttribute('data-theme') === 'light' ? '\u2600 Light' : '\u{1F319} Dark'}</button>
+              <button class="theme-toggle-btn" id="themeTogglePortal" style="flex:1;justify-content:center">${isLight ? '\u2600 Light' : '\u{1F319} Dark'}</button>
             </div>
             <button class="btn btn-secondary btn-sm" id="logoutBtn" style="width:100%">Logout</button>
           </div>
@@ -376,23 +384,28 @@
       </nav>
     `;
 
-    $$('.sidebar-nav a').forEach(a => a.addEventListener('click', () => { state.sidebarOpen = false; }));
+    $$('.sidebar-nav a').forEach(a => a.addEventListener('click', () => {}));
     $$('.bottom-nav-item').forEach(a => a.addEventListener('click', (e) => {
       e.preventDefault();
       window.location.hash = a.dataset.navHash;
     }));
     $('#logoutBtn').addEventListener('click', logout);
-    const toggle = $('#mobileToggle');
-    if (toggle) toggle.addEventListener('click', () => {
-      state.sidebarOpen = !state.sidebarOpen;
-      $('#sidebar').classList.toggle('open', state.sidebarOpen);
+    const mtbLogout = $('#mtbLogout');
+    if (mtbLogout) mtbLogout.addEventListener('click', logout);
+    function applyTheme(goLight) {
+      if (goLight) { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('portal_theme', 'light'); }
+      else { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('portal_theme', 'dark'); }
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = goLight ? '#ffffff' : '#09090b';
+      render();
+    }
+    const mtbTheme = $('#mtbTheme');
+    if (mtbTheme) mtbTheme.addEventListener('click', () => {
+      applyTheme(document.documentElement.getAttribute('data-theme') !== 'light');
     });
     const themeBtn = $('#themeTogglePortal');
     if (themeBtn) themeBtn.addEventListener('click', () => {
-      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      if (isLight) { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('portal_theme', 'dark'); }
-      else { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('portal_theme', 'light'); }
-      render();
+      applyTheme(document.documentElement.getAttribute('data-theme') !== 'light');
     });
   }
 
