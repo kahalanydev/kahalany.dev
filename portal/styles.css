@@ -655,6 +655,9 @@ table tr:hover td { background: var(--surface-2); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ===== BOTTOM NAV (hidden on desktop) ===== */
+.bottom-nav { display: none; }
+
 /* ===== MOBILE ===== */
 .mobile-toggle {
   display: none;
@@ -675,7 +678,7 @@ table tr:hover td { background: var(--surface-2); }
   .mobile-toggle { display: block; }
   .sidebar { transform: translateX(-100%); transition: transform 0.2s; }
   .sidebar.open { transform: translateX(0); }
-  .main { margin-left: 0; padding: 24px 16px; padding-top: 64px; }
+  .main { margin-left: 0; padding: 24px 12px; padding-top: 64px; }
   .form-row { flex-direction: column; }
   .hero-cards-grid { grid-template-columns: 1fr; }
   .project-overview-card { flex-direction: column; text-align: center; gap: 16px; }
@@ -688,6 +691,112 @@ table tr:hover td { background: var(--surface-2); }
   .phase-line { min-width: 10px; margin-top: 11px; }
   .dashboard-widgets { grid-template-columns: 1fr; }
   .project-content-grid { grid-template-columns: 1fr; }
+
+  .card { padding: 16px; }
+
+  /* ===== MOBILE CARD TABLES ===== */
+  .mobile-cards thead { display: none; }
+  .mobile-cards { border-collapse: separate; border-spacing: 0; }
+  .mobile-cards tbody tr {
+    display: block;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  .mobile-cards tbody tr:last-child { margin-bottom: 0; }
+  .mobile-cards tbody tr:hover td { background: transparent; }
+  .mobile-cards td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--surface-3);
+    font-size: 13px;
+  }
+  .mobile-cards td:last-child { border-bottom: none; }
+  .mobile-cards td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  .mobile-cards td[data-label=""] { justify-content: flex-end; }
+  .mobile-cards td[data-label=""]::before { display: none; }
+
+  /* Filter tabs scroll on mobile */
+  .filter-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .filter-tab { white-space: nowrap; flex-shrink: 0; padding: 8px 12px; }
+
+  /* Hero card compact */
+  .hero-card { padding: 16px; }
+  .hero-card-name { font-size: 16px; }
+
+  /* Ticket detail mobile */
+  .ticket-title { font-size: 18px; }
+  .comment { padding: 12px; }
+
+  /* Page headers with buttons wrap */
+  .page-header[style*="display:flex"] { flex-wrap: wrap; gap: 12px; }
+  .page-header h1 { font-size: 22px; }
+
+  /* ===== BOTTOM NAV BAR ===== */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 150;
+    padding: 4px 0;
+    padding-bottom: env(safe-area-inset-bottom, 4px);
+  }
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 500;
+    min-width: 0;
+    flex: 1;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav-item:hover { color: var(--text-secondary); }
+  .bottom-nav-item.active { color: var(--accent); }
+  .bottom-nav-icon { font-size: 20px; line-height: 1; }
+  .bottom-nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+  /* Adjust main content for bottom nav */
+  .main { padding-bottom: 70px !important; }
+
+  /* Keep hamburger as small "more" button for sidebar access (logout, theme) */
+  .mobile-toggle {
+    display: block;
+    top: 12px;
+    left: 12px;
+    padding: 6px 10px;
+    font-size: 16px;
+    opacity: 0.6;
+  }
 }
 
 @media (max-width: 480px) {
@@ -695,6 +804,12 @@ table tr:hover td { background: var(--surface-2); }
   .ticket-meta { flex-direction: column; gap: 4px; }
   .stat-item { min-width: 60px; }
   .stat-value { font-size: 18px; }
+  .main { padding: 16px 10px; padding-top: 60px; }
+  .mobile-cards td { font-size: 12px; }
+  .mobile-cards td::before { font-size: 10px; }
+  .phase-label { font-size: 8px; }
+  .phase-dot { width: 20px; height: 20px; font-size: 9px; }
+  .phase-line { min-width: 6px; margin-top: 9px; }
 }
 
 /* ===== DASHBOARD WIDGETS GRID ===== */

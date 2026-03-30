@@ -504,6 +504,9 @@ table td .mono {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ===== BOTTOM NAV (hidden on desktop) ===== */
+.bottom-nav { display: none; }
+
 /* ===== MOBILE TOGGLE ===== */
 .mobile-toggle {
   display: none;
@@ -537,7 +540,7 @@ table td .mono {
 
   .main {
     margin-left: 0;
-    padding: 24px 16px;
+    padding: 24px 12px;
     padding-top: 64px;
   }
 
@@ -546,11 +549,126 @@ table td .mono {
   }
 
   .page-header h1 { font-size: 22px; }
+
+  .card { padding: 16px; }
+
+  /* ===== MOBILE CARD TABLES ===== */
+  .mobile-cards thead { display: none; }
+  .mobile-cards { border-collapse: separate; border-spacing: 0; }
+  .mobile-cards tbody tr {
+    display: block;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .mobile-cards tbody tr:last-child { margin-bottom: 0; }
+  .mobile-cards tbody tr:hover td { background: transparent; }
+  .mobile-cards td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--surface-3);
+    font-size: 13px;
+  }
+  .mobile-cards td:last-child { border-bottom: none; }
+  .mobile-cards td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  .mobile-cards td[data-label=""] { justify-content: flex-end; }
+  .mobile-cards td[data-label=""]::before { display: none; }
+
+  /* Filter tabs scroll on mobile */
+  .filter-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .filter-tab { white-space: nowrap; flex-shrink: 0; padding: 8px 12px; }
+
+  /* Settings grids collapse on mobile */
+  [style*="grid-template-columns"][style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+
+  /* Form flex rows wrap */
+  .card form[style*="display:flex"] { flex-wrap: wrap; }
+
+  /* CC chat widget mobile */
+  .cc-messages { height: 250px; max-height: 250px; }
+
+  /* Page headers with buttons wrap */
+  .page-header[style*="display:flex"] { flex-wrap: wrap; gap: 12px; }
+
+  /* Buttons in mobile card action cells stack if needed */
+  .mobile-cards td[data-label=""] { flex-wrap: wrap; gap: 6px; }
+  .mobile-cards td[data-label=""] .btn-sm { font-size: 11px; padding: 5px 10px; }
+
+  /* Chart containers scale */
+  .chart-container { height: 220px !important; }
+
+  /* ===== BOTTOM NAV BAR ===== */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 150;
+    padding: 4px 0;
+    padding-bottom: env(safe-area-inset-bottom, 4px);
+  }
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 500;
+    min-width: 0;
+    flex: 1;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav-item:hover { color: var(--text-secondary); }
+  .bottom-nav-item.active { color: var(--accent); }
+  .bottom-nav-icon { font-size: 20px; line-height: 1; }
+  .bottom-nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+  /* Adjust main content for bottom nav */
+  .main { padding-bottom: 70px !important; }
+
+  /* Keep hamburger as small "more" button for sidebar access (logout, theme) */
+  .mobile-toggle {
+    display: block;
+    top: 12px;
+    left: 12px;
+    padding: 6px 10px;
+    font-size: 16px;
+    opacity: 0.6;
+  }
 }
 
 @media (max-width: 480px) {
   .metrics-grid { grid-template-columns: 1fr; }
   .login-card { padding: 24px; }
+  .main { padding: 16px 10px; padding-top: 60px; }
+  .mobile-cards td { font-size: 12px; }
+  .mobile-cards td::before { font-size: 10px; }
 }
 
 /* ===== MARKDOWN RENDERED ===== */

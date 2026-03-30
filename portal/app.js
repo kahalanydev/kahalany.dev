@@ -334,6 +334,12 @@
         ]
       : [{ id: 'dashboard', icon: '\u25A3', label: 'Dashboard', hash: '#/dashboard' }];
 
+    // Build bottom nav items (always include dashboard, plus project-specific when in a project)
+    const bottomItems = [{ id: 'dashboard', icon: '\u25A3', label: 'Projects', hash: '#/dashboard' }];
+    if (state.projectId) {
+      bottomItems.push(...navItems);
+    }
+
     app.innerHTML = `
       <button class="mobile-toggle" id="mobileToggle">\u2630</button>
       <div class="layout">
@@ -360,9 +366,21 @@
         </aside>
         <main class="main" id="mainContent">${content}</main>
       </div>
+      <nav class="bottom-nav" id="bottomNav">
+        ${bottomItems.map(n => `
+          <a href="${n.hash}" class="bottom-nav-item ${activeNav === n.id ? 'active' : ''}" data-nav-hash="${n.hash}">
+            <span class="bottom-nav-icon">${n.icon}</span>
+            <span class="bottom-nav-label">${n.label}</span>
+          </a>
+        `).join('')}
+      </nav>
     `;
 
     $$('.sidebar-nav a').forEach(a => a.addEventListener('click', () => { state.sidebarOpen = false; }));
+    $$('.bottom-nav-item').forEach(a => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.hash = a.dataset.navHash;
+    }));
     $('#logoutBtn').addEventListener('click', logout);
     const toggle = $('#mobileToggle');
     if (toggle) toggle.addEventListener('click', () => {
@@ -794,17 +812,17 @@
 
         <div class="card" style="padding:0">
           <div class="table-wrap">
-            <table>
+            <table class="mobile-cards">
               <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Updated</th></tr></thead>
               <tbody id="ticketTableBody">
                 ${tickets.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:32px">No tickets yet</td></tr>' :
                   tickets.map(t => `<tr data-ticket-id="${t.id}" data-status="${t.status}">
-                    <td style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
-                    <td style="color:var(--text);font-weight:500">${escapeHtml(t.title)}</td>
-                    <td>${typeBadge(t.type)}</td>
-                    <td>${priorityBadge(t.priority)}</td>
-                    <td>${statusBadge(t.status)}</td>
-                    <td>${timeAgo(t.updated_at)}</td>
+                    <td data-label="#" style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
+                    <td data-label="Title" style="color:var(--text);font-weight:500">${escapeHtml(t.title)}</td>
+                    <td data-label="Type">${typeBadge(t.type)}</td>
+                    <td data-label="Priority">${priorityBadge(t.priority)}</td>
+                    <td data-label="Status">${statusBadge(t.status)}</td>
+                    <td data-label="Updated">${timeAgo(t.updated_at)}</td>
                   </tr>`).join('')}
               </tbody>
             </table>

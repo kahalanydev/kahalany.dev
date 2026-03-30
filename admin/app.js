@@ -554,11 +554,23 @@
         </aside>
         <main class="main" id="mainContent">${content}</main>
       </div>
+      <nav class="bottom-nav" id="bottomNav">
+        ${navItems.map(n => `
+          <a href="#/${n.id}" class="bottom-nav-item ${state.page === n.id ? 'active' : ''}" data-page="${n.id}">
+            <span class="bottom-nav-icon">${n.icon}</span>
+            <span class="bottom-nav-label">${n.label}</span>
+          </a>
+        `).join('')}
+      </nav>
     `;
-    // Nav handlers
+    // Nav handlers (sidebar + bottom nav)
     $$('.sidebar-nav a').forEach(a => a.addEventListener('click', (e) => {
       e.preventDefault();
       state.sidebarOpen = false;
+      window.location.hash = `/${a.dataset.page}`;
+    }));
+    $$('.bottom-nav-item').forEach(a => a.addEventListener('click', (e) => {
+      e.preventDefault();
       window.location.hash = `/${a.dataset.page}`;
     }));
     $('#logoutBtn').addEventListener('click', logout);
@@ -735,15 +747,15 @@
               <a href="#/analytics" style="font-size:12px;color:var(--accent);text-decoration:none">Analytics</a>
             </div>
             <div class="table-wrap">
-              <table>
+              <table class="mobile-cards">
                 <thead><tr><th>IP</th><th>Location</th><th>Device</th><th>When</th></tr></thead>
                 <tbody>
                   ${d.recentVisitors.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No visitors yet</td></tr>' :
                     d.recentVisitors.map(v => `<tr>
-                      <td><span class="mono">${escapeHtml(v.ip)}</span> ${v.is_bot ? '<span class="badge badge-yellow">bot</span>' : ''}</td>
-                      <td>${escapeHtml(v.country ? `${v.city || ''}, ${v.country}` : 'Unknown')}</td>
-                      <td>${escapeHtml(v.device_type)}</td>
-                      <td>${timeAgo(v.created_at)}</td>
+                      <td data-label="IP"><span class="mono">${escapeHtml(v.ip)}</span> ${v.is_bot ? '<span class="badge badge-yellow">bot</span>' : ''}</td>
+                      <td data-label="Location">${escapeHtml(v.country ? `${v.city || ''}, ${v.country}` : 'Unknown')}</td>
+                      <td data-label="Device">${escapeHtml(v.device_type)}</td>
+                      <td data-label="When">${timeAgo(v.created_at)}</td>
                     </tr>`).join('')}
                 </tbody>
               </table>
@@ -843,16 +855,16 @@
             <span class="card-title">Suspicious Activity</span>
           </div>
           <div class="table-wrap">
-            <table>
+            <table class="mobile-cards">
               <thead><tr><th>Severity</th><th>IP</th><th>Reason</th><th>Details</th><th>When</th></tr></thead>
               <tbody>
                 ${d.suspicious.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">No suspicious activity detected</td></tr>' :
                   d.suspicious.slice(0, 50).map(s => `<tr>
-                    <td>${severityBadge(s.severity)}</td>
-                    <td><span class="mono">${escapeHtml(s.ip)}</span></td>
-                    <td>${escapeHtml(s.reason)}</td>
-                    <td>${escapeHtml(truncate(s.details, 40))}</td>
-                    <td>${timeAgo(s.created_at)}</td>
+                    <td data-label="Severity">${severityBadge(s.severity)}</td>
+                    <td data-label="IP"><span class="mono">${escapeHtml(s.ip)}</span></td>
+                    <td data-label="Reason">${escapeHtml(s.reason)}</td>
+                    <td data-label="Details">${escapeHtml(truncate(s.details, 40))}</td>
+                    <td data-label="When">${timeAgo(s.created_at)}</td>
                   </tr>`).join('')}
               </tbody>
             </table>
@@ -863,14 +875,14 @@
           <div class="card">
             <div class="card-header"><span class="card-title">Top IPs</span></div>
             <div class="table-wrap">
-              <table>
+              <table class="mobile-cards">
                 <thead><tr><th>IP</th><th>Location</th><th>Visits</th><th>Type</th></tr></thead>
                 <tbody>
                   ${d.topIPs.map(ip => `<tr>
-                    <td><span class="mono">${escapeHtml(ip.ip)}</span></td>
-                    <td>${escapeHtml(ip.country ? `${ip.city || ''}, ${ip.country}` : 'Unknown')}</td>
-                    <td><strong>${ip.count}</strong></td>
-                    <td>${ip.is_bot ? '<span class="badge badge-yellow">bot</span>' : '<span class="badge badge-green">human</span>'}</td>
+                    <td data-label="IP"><span class="mono">${escapeHtml(ip.ip)}</span></td>
+                    <td data-label="Location">${escapeHtml(ip.country ? `${ip.city || ''}, ${ip.country}` : 'Unknown')}</td>
+                    <td data-label="Visits"><strong>${ip.count}</strong></td>
+                    <td data-label="Type">${ip.is_bot ? '<span class="badge badge-yellow">bot</span>' : '<span class="badge badge-green">human</span>'}</td>
                   </tr>`).join('')}
                 </tbody>
               </table>
@@ -879,14 +891,14 @@
           <div class="card">
             <div class="card-header"><span class="card-title">Flagged IPs</span></div>
             <div class="table-wrap">
-              <table>
+              <table class="mobile-cards">
                 <thead><tr><th>IP</th><th>Incidents</th><th>Max Severity</th></tr></thead>
                 <tbody>
                   ${d.suspiciousIPs.length === 0 ? '<tr><td colspan="3" style="text-align:center;color:var(--text-dim)">No flagged IPs</td></tr>' :
                     d.suspiciousIPs.map(ip => `<tr>
-                      <td><span class="mono">${escapeHtml(ip.ip)}</span></td>
-                      <td><strong>${ip.incidents}</strong></td>
-                      <td>${severityBadge(ip.max_severity)}</td>
+                      <td data-label="IP"><span class="mono">${escapeHtml(ip.ip)}</span></td>
+                      <td data-label="Incidents"><strong>${ip.incidents}</strong></td>
+                      <td data-label="Severity">${severityBadge(ip.max_severity)}</td>
                     </tr>`).join('')}
                 </tbody>
               </table>
@@ -897,17 +909,17 @@
         <div class="card">
           <div class="card-header"><span class="card-title">Full Visitor Log</span></div>
           <div class="table-wrap">
-            <table>
+            <table class="mobile-cards">
               <thead><tr><th>IP</th><th>Location</th><th>ISP</th><th>Browser / OS</th><th>Referrer</th><th>Type</th><th>When</th></tr></thead>
               <tbody>
                 ${d.visitorLog.slice(0, 100).map(v => `<tr>
-                  <td><span class="mono">${escapeHtml(v.ip)}</span></td>
-                  <td>${escapeHtml(v.country ? `${v.city || ''}, ${v.country}` : 'Unknown')}</td>
-                  <td>${escapeHtml(truncate(v.isp, 25) || '-')}</td>
-                  <td>${escapeHtml(truncate(v.browser, 15))} / ${escapeHtml(truncate(v.os, 15))}</td>
-                  <td>${escapeHtml(truncate(v.referrer, 30) || 'Direct')}</td>
-                  <td>${v.is_bot ? '<span class="badge badge-yellow">bot</span>' : '<span class="badge badge-green">human</span>'}</td>
-                  <td>${timeAgo(v.created_at)}</td>
+                  <td data-label="IP"><span class="mono">${escapeHtml(v.ip)}</span></td>
+                  <td data-label="Location">${escapeHtml(v.country ? `${v.city || ''}, ${v.country}` : 'Unknown')}</td>
+                  <td data-label="ISP">${escapeHtml(truncate(v.isp, 25) || '-')}</td>
+                  <td data-label="Browser/OS">${escapeHtml(truncate(v.browser, 15))} / ${escapeHtml(truncate(v.os, 15))}</td>
+                  <td data-label="Referrer">${escapeHtml(truncate(v.referrer, 30) || 'Direct')}</td>
+                  <td data-label="Type">${v.is_bot ? '<span class="badge badge-yellow">bot</span>' : '<span class="badge badge-green">human</span>'}</td>
+                  <td data-label="When">${timeAgo(v.created_at)}</td>
                 </tr>`).join('')}
               </tbody>
             </table>
@@ -967,13 +979,13 @@
           <div class="card">
             <div class="card-header"><span class="card-title">Click Tracking</span></div>
             <div class="table-wrap">
-              <table>
+              <table class="mobile-cards">
                 <thead><tr><th>Element</th><th>Clicks</th></tr></thead>
                 <tbody>
                   ${d.clickEvents.length === 0 ? '<tr><td colspan="2" style="text-align:center;color:var(--text-dim)">No click data yet</td></tr>' :
                     d.clickEvents.map(c => `<tr>
-                      <td>${escapeHtml(c.target)}</td>
-                      <td><strong>${c.clicks}</strong></td>
+                      <td data-label="Element">${escapeHtml(c.target)}</td>
+                      <td data-label="Clicks"><strong>${c.clicks}</strong></td>
                     </tr>`).join('')}
                 </tbody>
               </table>
@@ -982,13 +994,13 @@
           <div class="card">
             <div class="card-header"><span class="card-title">Referrer Sources</span></div>
             <div class="table-wrap">
-              <table>
+              <table class="mobile-cards">
                 <thead><tr><th>Source</th><th>Visits</th></tr></thead>
                 <tbody>
                   ${d.referrers.length === 0 ? '<tr><td colspan="2" style="text-align:center;color:var(--text-dim)">No referrer data yet</td></tr>' :
                     d.referrers.map(r => `<tr>
-                      <td>${escapeHtml(truncate(r.source, 50))}</td>
-                      <td><strong>${r.count}</strong></td>
+                      <td data-label="Source">${escapeHtml(truncate(r.source, 50))}</td>
+                      <td data-label="Visits"><strong>${r.count}</strong></td>
                     </tr>`).join('')}
                 </tbody>
               </table>
@@ -1004,12 +1016,12 @@
           <div class="card">
             <div class="card-header"><span class="card-title">Browsers</span></div>
             <div class="table-wrap">
-              <table>
+              <table class="mobile-cards">
                 <thead><tr><th>Browser</th><th>Visits</th></tr></thead>
                 <tbody>
                   ${d.browsers.map(b => `<tr>
-                    <td>${escapeHtml(b.browser)}</td>
-                    <td><strong>${b.count}</strong></td>
+                    <td data-label="Browser">${escapeHtml(b.browser)}</td>
+                    <td data-label="Visits"><strong>${b.count}</strong></td>
                   </tr>`).join('')}
                 </tbody>
               </table>
@@ -1159,7 +1171,7 @@
             </div>
             <div id="usersMsg"></div>
             <div class="table-wrap" style="margin-bottom:20px">
-              <table>
+              <table class="mobile-cards">
                 <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                   ${users.map(u => {
@@ -1167,11 +1179,11 @@
                       : u.role === 'staff' ? '<span class="badge badge-purple" style="background:rgba(168,85,247,0.15);color:#c084fc">staff</span>'
                       : '<span class="badge badge-green">client</span>';
                     return `<tr>
-                    <td>${escapeHtml(u.email)}</td>
-                    <td>${escapeHtml(u.name || '-')}</td>
-                    <td>${roleBadge}</td>
-                    <td>${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
-                    <td>${u.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" data-reset-user="${u.id}" style="margin-right:4px">Reset PW</button><button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Remove</button>` : '<span class="badge badge-blue">you</span>'}</td>
+                    <td data-label="Email">${escapeHtml(u.email)}</td>
+                    <td data-label="Name">${escapeHtml(u.name || '-')}</td>
+                    <td data-label="Role">${roleBadge}</td>
+                    <td data-label="Status">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
+                    <td data-label="">${u.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" data-reset-user="${u.id}" style="margin-right:4px">Reset PW</button><button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Remove</button>` : '<span class="badge badge-blue">you</span>'}</td>
                   </tr>`;
                   }).join('')}
                 </tbody>
@@ -1272,16 +1284,16 @@
           <div id="devKeysMsg"></div>
           ${devKeys.length ? `
           <div class="table-wrap" style="margin-bottom:20px">
-            <table>
+            <table class="mobile-cards">
               <thead><tr><th>Key ID</th><th>Label</th><th>Status</th><th>Last Used</th><th>Created</th><th></th></tr></thead>
               <tbody>
                 ${devKeys.map(k => `<tr>
-                  <td><code style="font-family:var(--mono);font-size:12px">${escapeHtml(k.key_id)}</code></td>
-                  <td>${escapeHtml(k.label || '-')}</td>
-                  <td>${k.revoked ? '<span class="badge badge-red">revoked</span>' : (k.expires_at && new Date(k.expires_at) < new Date() ? '<span class="badge badge-yellow">expired</span>' : '<span class="badge badge-green">active</span>')}</td>
-                  <td>${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'never'}</td>
-                  <td>${new Date(k.created_at).toLocaleDateString()}</td>
-                  <td>${!k.revoked ? `<button class="btn btn-danger btn-sm" data-revoke-key="${escapeHtml(k.key_id)}">Revoke</button>` : ''}</td>
+                  <td data-label="Key ID"><code style="font-family:var(--mono);font-size:12px">${escapeHtml(k.key_id)}</code></td>
+                  <td data-label="Label">${escapeHtml(k.label || '-')}</td>
+                  <td data-label="Status">${k.revoked ? '<span class="badge badge-red">revoked</span>' : (k.expires_at && new Date(k.expires_at) < new Date() ? '<span class="badge badge-yellow">expired</span>' : '<span class="badge badge-green">active</span>')}</td>
+                  <td data-label="Last Used">${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'never'}</td>
+                  <td data-label="Created">${new Date(k.created_at).toLocaleDateString()}</td>
+                  <td data-label="">${!k.revoked ? `<button class="btn btn-danger btn-sm" data-revoke-key="${escapeHtml(k.key_id)}">Revoke</button>` : ''}</td>
                 </tr>`).join('')}
               </tbody>
             </table>
@@ -1636,17 +1648,17 @@
 
         <div class="card" style="padding:0">
           <div class="table-wrap">
-            <table>
+            <table class="mobile-cards">
               <thead><tr><th>Project</th><th>Client</th><th>Status</th><th>Progress</th><th>Tickets</th><th>Last Activity</th></tr></thead>
               <tbody>
                 ${projects.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:32px">No projects yet</td></tr>' :
                   projects.map(p => `<tr data-project-id="${p.id}" style="cursor:pointer">
-                    <td style="color:var(--text);font-weight:500">${escapeHtml(p.name)}</td>
-                    <td>${escapeHtml(p.org_name)}</td>
-                    <td><span class="badge ${statusColors[p.status] || 'badge-gray'}">${p.status.replace(/_/g, ' ')}</span></td>
-                    <td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:var(--surface-3);border-radius:3px;min-width:60px"><div style="height:100%;background:var(--accent);border-radius:3px;width:${p.progress_percent}%"></div></div><span style="font-size:11px">${p.progress_percent}%</span></div></td>
-                    <td>${p.open_tickets > 0 ? `<span class="badge badge-yellow">${p.open_tickets} open</span>` : '<span style="color:var(--text-dim)">0</span>'}</td>
-                    <td>${p.last_activity ? timeAgo(p.last_activity) : '-'}</td>
+                    <td data-label="Project" style="color:var(--text);font-weight:500">${escapeHtml(p.name)}</td>
+                    <td data-label="Client">${escapeHtml(p.org_name)}</td>
+                    <td data-label="Status"><span class="badge ${statusColors[p.status] || 'badge-gray'}">${p.status.replace(/_/g, ' ')}</span></td>
+                    <td data-label="Progress"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:var(--surface-3);border-radius:3px;min-width:60px"><div style="height:100%;background:var(--accent);border-radius:3px;width:${p.progress_percent}%"></div></div><span style="font-size:11px">${p.progress_percent}%</span></div></td>
+                    <td data-label="Tickets">${p.open_tickets > 0 ? `<span class="badge badge-yellow">${p.open_tickets} open</span>` : '<span style="color:var(--text-dim)">0</span>'}</td>
+                    <td data-label="Activity">${p.last_activity ? timeAgo(p.last_activity) : '-'}</td>
                   </tr>`).join('')}
               </tbody>
             </table>
@@ -2080,20 +2092,20 @@
           if (!tsEl) return;
           const statusClass = (s) => s==='open'?'badge-blue':s==='in_progress'?'badge-yellow':(s==='completed'||s==='closed')?'badge-green':'badge-gray';
           tsEl.innerHTML = tickets.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No tickets yet.</p>' : `
-            <div class="table-wrap"><table>
+            <div class="table-wrap"><table class="mobile-cards">
               <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Updated</th></tr></thead>
               <tbody>${tickets.map(t => `<tr data-ticket-href="#/tickets/${t.id}" style="cursor:pointer">
-                <td style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
-                <td style="color:var(--text)">${escapeHtml(t.title)}</td>
-                <td><span class="badge badge-gray">${t.type.replace(/_/g,' ')}</span></td>
-                <td><span class="badge ${t.priority==='high'||t.priority==='urgent'?'badge-red':t.priority==='medium'?'badge-yellow':'badge-gray'}">${t.priority}</span></td>
-                <td>
+                <td data-label="#" style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
+                <td data-label="Title" style="color:var(--text)">${escapeHtml(t.title)}</td>
+                <td data-label="Type"><span class="badge badge-gray">${t.type.replace(/_/g,' ')}</span></td>
+                <td data-label="Priority"><span class="badge ${t.priority==='high'||t.priority==='urgent'?'badge-red':t.priority==='medium'?'badge-yellow':'badge-gray'}">${t.priority}</span></td>
+                <td data-label="Status">
                   <select class="inline-ticket-status" data-ticket-id="${t.id}" style="padding:3px 6px;font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer">
                     ${['open','in_progress','review','completed','closed'].map(s => `<option value="${s}" ${s===t.status?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}
                   </select>
                 </td>
-                <td>${escapeHtml(t.assigned_to_name || '-')}</td>
-                <td>${timeAgo(t.updated_at)}</td>
+                <td data-label="Assigned">${escapeHtml(t.assigned_to_name || '-')}</td>
+                <td data-label="Updated">${timeAgo(t.updated_at)}</td>
               </tr>`).join('')}</tbody>
             </table></div>
           `;
@@ -2827,11 +2839,11 @@
           const el = $(`#usersList-${o.id}`);
           if (!el) continue;
           el.innerHTML = users.length === 0 ? 'No portal users yet.' :
-            `<table style="width:100%;font-size:13px"><thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Email</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Name</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Status</th><th style="padding:6px 8px;border-bottom:1px solid var(--border)"></th></tr></thead><tbody>${users.map(u => `<tr>
-              <td style="padding:6px 8px">${escapeHtml(u.email)}${u.is_cross_org ? ' <span class="badge badge-blue" style="font-size:10px">cross-org</span>' : ''}</td>
-              <td style="padding:6px 8px">${escapeHtml(u.name || '-')}</td>
-              <td style="padding:6px 8px">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
-              <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+            `<table class="mobile-cards" style="width:100%;font-size:13px"><thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Email</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Name</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Status</th><th style="padding:6px 8px;border-bottom:1px solid var(--border)"></th></tr></thead><tbody>${users.map(u => `<tr>
+              <td data-label="Email" style="padding:6px 8px">${escapeHtml(u.email)}${u.is_cross_org ? ' <span class="badge badge-blue" style="font-size:10px">cross-org</span>' : ''}</td>
+              <td data-label="Name" style="padding:6px 8px">${escapeHtml(u.name || '-')}</td>
+              <td data-label="Status" style="padding:6px 8px">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
+              <td data-label="" style="padding:6px 8px;text-align:right;white-space:nowrap">
                 <button class="btn btn-secondary btn-sm client-reset-pw" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}" style="margin-right:4px">Reset PW</button>
                 <button class="btn btn-danger btn-sm client-delete-user" data-org-id="${o.id}" data-user-id="${u.id}" data-email="${escapeHtml(u.email).replace(/"/g, '&quot;')}" data-cross-org="${u.is_cross_org ? 1 : 0}">Remove</button>
               </td>
