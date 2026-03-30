@@ -707,6 +707,50 @@ Replaced regex-and-`<br>` approach with proper block parser for both admin and p
 
 ---
 
+## 2026-03-30 — Ticket Resolution Pipeline Fix
+
+### Problem
+Tickets resolved via Claude Code in the admin chat widget were never actually closed in the database. The admin dashboard, project detail page, and client portal all continued showing the ticket as "open" even after Claude Code reported it as resolved.
+
+### Root Cause (3 bugs stacking)
+
+1. **Unreliable HMAC bash script in CLAUDE.md** — The scaffolded CLAUDE.md told Claude Code to resolve tickets using a complex bash script requiring `python3`, `sha256sum`, and `openssl dgst`. These tools aren't reliably available on Windows/MINGW. Claude Code skipped the script and instead just marked the local ticket file with `_resolved: true`, saying the sync service would handle it.
+
+2. **Missing `ID:` field in ticket file** — Claude Code wrote the ticket file itself (not via the sync service), so it only had `Ticket: #1` but no `ID:` (UUID) field. The portal sync's push mechanism searched for `^ID:` to find the ticket UUID and silently skipped resolution when it wasn't found.
+
+3. **Empty API credentials in `.portal.json`** — The dev API key was configured in the Claude Code Desktop store *after* the project was scaffolded. The `.portal.json` captured empty `key_id`/`secret` at scaffold time and was never updated, so even the resolve-ticket script would have failed.
+
+### Fixes
+
+#### Kahalany.Dev Site (server)
+- **`server/routes/dev.js`** — Resolve endpoint now accepts ticket number + `project_id` as a fallback when UUID lookup fails. `ticketId` param can be a UUID or a ticket number (e.g. `1`).
+- **`admin/app.js`** — Auto-refreshes the tickets table 2 seconds after `claude:done` event fires. The admin no longer needs to manually reload the page to see updated ticket status.
+
+#### Claude Code Desktop (portal-sync.js)
+- **New resolve-ticket.js script** — Simple Node.js script scaffolded into `.portal/scripts/resolve-ticket.js` on project creation. Handles HMAC signing natively using Node.js `crypto` module — no bash/python/openssl dependencies.
+- **CLAUDE.md template simplified** — Replaced the 15-line bash HMAC script with a single command: `node .portal/scripts/resolve-ticket.js "<ticketId>" "<client message>"`.
+- **Sync fallback for missing ID** — When `ID:` field is missing, sync now falls back to `Ticket: #N` number extraction + `project_id` for the API call.
+- **Body resolution extraction** — Also searches for `Resolution:` in the ticket body (after frontmatter), not just in frontmatter fields.
+- **Credential auto-refresh** — On every sync cycle, `.portal.json` credentials are updated from the Desktop store if they've changed, fixing projects scaffolded before the dev key was configured.
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/routes/dev.js` | Ticket number + project_id fallback on resolve endpoint |
+| `admin/app.js` | Auto-refresh tickets table after `claude:done` |
+| `Claude-Code-Desk-Mobile/.../portal-sync.js` | Resolve script generator, CLAUDE.md template rewrite, sync fallback logic, credential refresh |
+
+### Ticket Resolution Flow (after fix)
+```
+Claude Code resolves a ticket →
+  Option A (preferred): runs `node .portal/scripts/resolve-ticket.js` → hits dev API directly → DB updated immediately
+  Option B (fallback): marks ticket file with _resolved: true → sync service picks up on next cycle (≤5 min) → resolves via API using ticket number fallback
+  → Admin panel auto-refreshes tickets table after claude:done
+  → Client portal shows updated status on next page load
+```
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [x] ~~Add more contact methods (phone, WhatsApp, Calendly)~~ — Added WhatsApp + contact form

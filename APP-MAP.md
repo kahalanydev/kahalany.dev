@@ -282,6 +282,7 @@ Client → Traefik (SSL) → Express (:8080)
 - Comment thread with internal note option (yellow-bordered)
 - Post as public or internal comment
 - Auto-notifications on creation (email + webhook)
+- **Dev API resolve** accepts both UUID and ticket number (with `project_id` fallback)
 
 ### Claude Code Integration (Project Detail)
 - Chat widget in grid-2 right column (next to Milestones) on every project detail page
@@ -290,7 +291,15 @@ Client → Traefik (SSL) → Express (:8080)
 - Folder mapping: select local project folder from CC server's folder list
 - Real-time streaming: WebSocket connection for `claude:stream`, `claude:tool-use`, `claude:done` events
 - Chat features: markdown rendering, tool use badges, send/stop/reset, in-memory history
+- **Auto-refresh**: Tickets table refreshes automatically after Claude Code completes a response
 - Architecture: Browser ↔ Cloudflare Tunnel ↔ localhost:3141 (Claude Code server) ↔ Claude CLI
+
+### Portal Sync Service (Claude Code Desktop)
+- Polls every 5 min + startup sync for ticket/milestone changes
+- **Scaffolds projects** with `.portal.json`, `.portal/tickets/`, `.portal/scripts/resolve-ticket.js`, and `CLAUDE.md`
+- **Resolve script**: Node.js helper (`resolve-ticket.js`) handles HMAC signing natively — Claude Code runs it via `node .portal/scripts/resolve-ticket.js`
+- **Push sync**: Pushes dirty milestone updates + locally resolved tickets (falls back to ticket number when UUID missing)
+- **Credential refresh**: Updates `.portal.json` API credentials from Desktop store on every sync cycle
 
 ## Theming
 - **Dark/light mode** across all three frontends (main site, admin, portal)
