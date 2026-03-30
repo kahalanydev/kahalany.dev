@@ -510,14 +510,13 @@ Every Coolify redeploy wiped the SQLite database because no persistent volume wa
 ### Deploy Workflow (established)
 1. Make changes locally
 2. `git add` + `git commit` + `git push origin master`
-3. SSH to server and trigger: `curl -X POST -H 'Authorization: Bearer 9|stagingsetuptoken1773060763' 'http://localhost:8000/api/v1/deploy?uuid=zcco40skss0o8wwocs40k4gs&force=true'`
+3. Auto-deploys via GitHub webhook to Coolify
 4. Container rebuilds from GitHub, volume persists data
 
 ### SMTP Configuration
-- Host: `smtp.gmail.com`, Port: `587`
-- Username: `kahalanydev@gmail.com`
-- Password: Google App Password (2FA required, generated at myaccount.google.com → Security → App Passwords)
-- From: `"Kahalany.Dev" <kahalanydev@gmail.com>`
+- Configured via Admin Panel → Settings → Notifications
+- Gmail App Password (2FA required, generated at myaccount.google.com → Security → App Passwords)
+- Settings stored in SQLite `config` table (not in code)
 
 ---
 

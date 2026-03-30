@@ -288,9 +288,9 @@ Client → Traefik (SSL) → Express (:8080)
 
 ## Deployment
 - **Docker**: `node:20-alpine` runs Express on port 8080
-- **Coolify**: public repo, deploy via API (`POST /api/v1/deploy?uuid=zcco40skss0o8wwocs40k4gs&force=true`)
+- **Coolify**: public repo, auto-deploys via GitHub webhook
 - **Traefik**: routes `kahalany.dev` → container:8080, auto-SSL
 - **Persistent storage**: Docker volume `kahalany-dev-data` mounted at `/app/data` (configured in Coolify DB, survives redeploys)
-- **SMTP**: Gmail via App Password (kahalanydev@gmail.com), configured in admin Settings
+- **SMTP**: Gmail via App Password, configured in admin Settings (stored in DB, not in code)
 - **First run**: check Coolify deployment logs for the initial admin password
 - **Deploy workflow**: commit + push to GitHub → Coolify auto-deploys via webhook (manual_webhook_secret_github)
