@@ -268,28 +268,65 @@
     },
     off(event, cb) { const s = this._wsListeners.get(event); if (s) s.delete(cb); },
 
-    // Get CC key for a portal project
-    keyFor(projectId) { return `portal-${projectId}`; },
+    // Get CC key — uses folder name to match Desktop/PWA convention
+    keyFor(projectId) {
+      const map = this.getProjectMap();
+      const path = map[projectId];
+      if (!path) return null;
+      return path.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || null;
+    },
+
+    // Load chat history from CC server (shared with Desktop/PWA)
+    async loadHistory(projectId) {
+      const key = this.keyFor(projectId);
+      if (!key) return;
+      try {
+        const data = await this.api(`/api/history/${encodeURIComponent(key)}`);
+        this.chats[projectId] = (data.messages || []).map(m => ({
+          role: m.role, content: m.content, tools: m.tools || [], timestamp: m.timestamp
+        }));
+      } catch {
+        if (!this.chats[projectId]) this.chats[projectId] = [];
+      }
+    },
+
+    // Save a message to CC server history (so Desktop/PWA can see it)
+    _lastHistorySave: 0,
+    async saveMessage(projectId, message) {
+      const key = this.keyFor(projectId);
+      if (!key) return;
+      this._lastHistorySave = Date.now();
+      try {
+        await this.api(`/api/history/${encodeURIComponent(key)}`, {
+          method: 'POST',
+          body: JSON.stringify({ message, general: false })
+        });
+      } catch { /* ignore */ }
+    },
 
     // Send message to Claude via CC server
     async send(projectId, message, projectPath) {
       const key = this.keyFor(projectId);
+      if (!key) throw new Error('No folder mapped');
       const body = { key, message, projectPath };
       return this.api('/api/claude/send', { method: 'POST', body: JSON.stringify(body) });
     },
 
     async stop(projectId) {
       const key = this.keyFor(projectId);
+      if (!key) return;
       return this.api('/api/claude/stop', { method: 'POST', body: JSON.stringify({ key }) });
     },
 
     async reset(projectId) {
       const key = this.keyFor(projectId);
+      if (!key) return;
       return this.api('/api/claude/reset', { method: 'POST', body: JSON.stringify({ key }) });
     },
 
     async isRunning(projectId) {
       const key = this.keyFor(projectId);
+      if (!key) return false;
       const res = await this.api(`/api/claude/status/${encodeURIComponent(key)}`);
       return res.running;
     },
@@ -1871,13 +1908,18 @@
 
       // ===== CLAUDE CODE CHAT WIDGET =====
       if (cc.isConnected()) {
-        const ccKey = cc.keyFor(projectId);
         const projectMap = cc.getProjectMap();
         const mappedPath = projectMap[projectId];
+        const ccKey = cc.keyFor(projectId); // Derives from folder name (matches Desktop/PWA)
 
-        // Init chat state
+        // Init streaming state
         if (!cc.chats[projectId]) cc.chats[projectId] = [];
         if (!cc.streaming[projectId]) cc.streaming[projectId] = { text: '', tools: [], active: false };
+
+        // Load shared history from CC server (synced with Desktop/PWA)
+        if (mappedPath) {
+          await cc.loadHistory(projectId);
+        }
 
         // Render header actions (folder selector)
         const headerActions = $('#ccHeaderActions');
@@ -1983,7 +2025,20 @@
         cc.disconnectWs();
         cc.connectWs();
 
-        // WS event handlers
+        // WS event handlers — shared with Desktop/PWA (same key)
+        cc.on('claude:process-started', (msg) => {
+          if (msg.key !== ccKey) return;
+          // Desktop started a Claude process — show thinking state
+          if (!cc.streaming[projectId].active) {
+            cc.streaming[projectId] = { text: '', tools: [], active: true };
+            renderCcChat();
+            const sendBtn = $('#ccSendBtn');
+            const stopBtn = $('#ccStopBtn');
+            if (sendBtn) sendBtn.style.display = 'none';
+            if (stopBtn) stopBtn.style.display = '';
+          }
+        });
+
         cc.on('claude:stream', (msg) => {
           if (msg.key !== ccKey) return;
           cc.streaming[projectId].text = msg.text || '';
@@ -2024,6 +2079,7 @@
           cc.streaming[projectId] = { text: '', tools: [], active: false };
           if (content) {
             cc.chats[projectId].push({ role: 'assistant', content, tools });
+            cc.saveMessage(projectId, { role: 'assistant', content, timestamp: Date.now() });
           } else if (msg.error) {
             cc.chats[projectId].push({ role: 'assistant', content: `Error: ${msg.error}`, tools: [] });
           }
@@ -2036,6 +2092,16 @@
           renderCcChat();
         });
 
+        // Sync: reload history when Desktop/PWA saves a message
+        if (ccKey) {
+          cc.on('history:updated', async (msg) => {
+            if (msg.key !== ccKey) return;
+            if (Date.now() - cc._lastHistorySave < 2000) return; // Skip self-triggered
+            await cc.loadHistory(projectId);
+            renderCcChat();
+          });
+        }
+
         // Send message
         async function ccSendMessage() {
           const input = $('#ccMsgInput');
@@ -2045,6 +2111,7 @@
           input.value = '';
 
           cc.chats[projectId].push({ role: 'user', content: msg });
+          cc.saveMessage(projectId, { role: 'user', content: msg, timestamp: Date.now() });
           cc.streaming[projectId] = { text: '', tools: [], active: true };
           renderCcChat();
           // Hide send, show stop immediately
@@ -2087,7 +2154,12 @@
         if (ccResetBtn) ccResetBtn.addEventListener('click', async () => {
           cc.chats[projectId] = [];
           cc.streaming[projectId] = { text: '', tools: [], active: false };
-          try { await cc.reset(projectId); } catch {}
+          try {
+            await cc.reset(projectId);
+            // Clear shared history on CC server too
+            const key = cc.keyFor(projectId);
+            if (key) await cc.api(`/api/history/${encodeURIComponent(key)}`, { method: 'DELETE' });
+          } catch {}
           renderCcChat();
         });
       }
