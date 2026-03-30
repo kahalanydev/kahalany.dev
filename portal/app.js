@@ -149,25 +149,44 @@
   // ===== MARKDOWN RENDERER =====
   function renderMarkdown(text) {
     if (!text) return '';
-    let html = text;
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--surface-3);padding:12px;border-radius:var(--radius);overflow-x:auto;font-size:12px"><code>$2</code></pre>');
-    html = html.replace(/`([^`]+)`/g, '<code style="background:var(--surface-3);padding:2px 6px;border-radius:3px;font-size:12px">$1</code>');
-    html = html.replace(/^#### (.+)$/gm, '<h4 style="font-size:14px;margin:16px 0 8px;color:var(--text)">$1</h4>');
-    html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:15px;margin:18px 0 8px;color:var(--text)">$1</h3>');
-    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:17px;margin:20px 0 10px;color:var(--text)">$1</h2>');
-    html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:20px;margin:24px 0 12px;color:var(--text)">$1</h1>');
-    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>');
-    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">');
-    html = html.replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;color:var(--text-secondary)">$1</li>');
-    html = html.replace(/^\d+\. (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;list-style:decimal;color:var(--text-secondary)">$1</li>');
-    html = html.replace(/\[x\]/g, '<span style="color:var(--success)">&#9745;</span>');
-    html = html.replace(/\[ \]/g, '<span style="color:var(--text-dim)">&#9744;</span>');
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--accent)">$1</a>');
-    html = html.replace(/\n\n/g, '<br><br>');
-    html = html.replace(/\n/g, '<br>');
-    return html;
+    function inline(t) {
+      return t
+        .replace(/\[x\]/g, '<span class="md-check done">&#9745;</span>')
+        .replace(/\[ \]/g, '<span class="md-check">&#9744;</span>')
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    }
+    const codeBlocks = [];
+    let src = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      codeBlocks.push(`<pre><code>${code}</code></pre>`);
+      return `\x00CB${codeBlocks.length - 1}\x00`;
+    });
+    const lines = src.split('\n');
+    const out = [];
+    let listType = null;
+    let para = [];
+    function flushPara() { if (para.length) { out.push(`<p>${para.join(' ')}</p>`); para = []; } }
+    function flushList() { if (listType) { out.push(`</${listType}>`); listType = null; } }
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { flushPara(); flushList(); continue; }
+      const cm = t.match(/^\x00CB(\d+)\x00$/);
+      if (cm) { flushPara(); flushList(); out.push(codeBlocks[+cm[1]]); continue; }
+      const hm = t.match(/^(#{1,4}) (.+)$/);
+      if (hm) { flushPara(); flushList(); out.push(`<h${hm[1].length}>${inline(hm[2])}</h${hm[1].length}>`); continue; }
+      if (t === '---' || t === '***' || t === '___') { flushPara(); flushList(); out.push('<hr>'); continue; }
+      const ul = t.match(/^[-*] (.+)$/);
+      if (ul) { flushPara(); if (listType !== 'ul') { flushList(); out.push('<ul>'); listType = 'ul'; } out.push(`<li>${inline(ul[1])}</li>`); continue; }
+      const ol = t.match(/^\d+\. (.+)$/);
+      if (ol) { flushPara(); if (listType !== 'ol') { flushList(); out.push('<ol>'); listType = 'ol'; } out.push(`<li>${inline(ol[1])}</li>`); continue; }
+      flushList();
+      para.push(inline(t));
+    }
+    flushPara(); flushList();
+    return out.join('\n');
   }
 
   // ===== RENDER: LOGIN =====
