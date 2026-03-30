@@ -209,13 +209,21 @@ router.post('/progress', (req, res) => {
 // - resolution_notes: internal technical notes (fallback if no client_message)
 router.post('/tickets/:ticketId/resolve', (req, res) => {
   const db = getDb();
+  console.log(`[DEV] Resolve ticket called: ticketId=${req.params.ticketId}, body=`, JSON.stringify(req.body));
+
   let ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.ticketId);
   // Fall back to ticket_number + project_id lookup
   if (!ticket && req.body.project_id) {
     ticket = db.prepare('SELECT * FROM tickets WHERE ticket_number = ? AND project_id = ?')
       .get(parseInt(req.params.ticketId), req.body.project_id);
+    if (ticket) console.log(`[DEV] Found ticket via number fallback: #${ticket.ticket_number} (${ticket.id})`);
   }
-  if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' });
+  if (!ticket) {
+    console.log(`[DEV] Ticket not found for: ${req.params.ticketId}`);
+    return res.status(404).json({ success: false, error: 'Ticket not found' });
+  }
+
+  console.log(`[DEV] Resolving ticket #${ticket.ticket_number} "${ticket.title}" (current status: ${ticket.status})`);
 
   const { resolution_notes, client_message } = req.body;
   const publicMessage = client_message || resolution_notes;
@@ -233,8 +241,13 @@ router.post('/tickets/:ticketId/resolve', (req, res) => {
   }
 
   // Close the ticket
-  db.prepare("UPDATE tickets SET status = 'closed', closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+  const result = db.prepare("UPDATE tickets SET status = 'closed', closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
     .run(ticket.id);
+  console.log(`[DEV] Ticket UPDATE result: changes=${result.changes}`);
+
+  // Verify the update took effect
+  const updated = db.prepare('SELECT status, closed_at FROM tickets WHERE id = ?').get(ticket.id);
+  console.log(`[DEV] Ticket #${ticket.ticket_number} after update: status=${updated.status}, closed_at=${updated.closed_at}`);
 
   logActivity(db, {
     projectId: ticket.project_id, action: 'ticket_resolved',
@@ -242,7 +255,7 @@ router.post('/tickets/:ticketId/resolve', (req, res) => {
     details: { ticket_number: ticket.ticket_number, resolved_by: 'dev_api' }
   });
 
-  res.json({ success: true, data: { message: 'Ticket resolved' } });
+  res.json({ success: true, data: { message: 'Ticket resolved', ticket_number: ticket.ticket_number, status: updated.status } });
 
   // Notify client org members via email (async, non-blocking)
   try {

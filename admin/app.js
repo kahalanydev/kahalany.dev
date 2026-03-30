@@ -1310,6 +1310,14 @@
 
         <div class="card" style="margin-top:20px">
           <div class="card-header">
+            <span class="card-title">Dev API Diagnostics</span>
+            <button class="btn btn-secondary btn-sm" id="runDevDiagBtn">Run Check</button>
+          </div>
+          <div id="devDiagResult" style="font-size:13px;color:var(--text-secondary)">Click "Run Check" to verify the dev API is working and see recent ticket resolution activity.</div>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
             <span class="card-title">Claude Code</span>
             ${cc.isConnected() ? '<span class="badge badge-green">Connected</span>' : '<span class="badge badge-gray">Not connected</span>'}
           </div>
@@ -1514,6 +1522,41 @@
           $('#devKeysMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
       }));
+
+      // Dev API diagnostics
+      const devDiagBtn = $('#runDevDiagBtn');
+      if (devDiagBtn) devDiagBtn.addEventListener('click', async () => {
+        const el = $('#devDiagResult');
+        el.innerHTML = '<div class="loading"><div class="spinner"></div> Checking...</div>';
+        try {
+          const res = await api('/admin/dev-api-status');
+          const d = res.data;
+          el.innerHTML = `
+            <div style="display:grid;gap:12px">
+              <div><strong>Active dev keys:</strong> ${d.active_keys}${d.active_keys === 0 ? ' <span class="badge badge-red">No keys!</span> — create one above' : ''}</div>
+              ${d.keys.map(k => `<div style="padding:8px;background:var(--surface-2);border-radius:var(--radius);font-size:12px">
+                <code>${escapeHtml(k.key_id)}</code> (${escapeHtml(k.label || 'no label')})
+                — Last used: <strong>${k.last_used ? timeAgo(k.last_used) : '<span style="color:var(--danger)">never</span>'}</strong>
+                ${k.expires ? ` — Expires: ${new Date(k.expires).toLocaleDateString()}` : ''}
+              </div>`).join('')}
+              <div><strong>Recent ticket resolutions (via dev API):</strong></div>
+              ${d.recent_resolves.length === 0 ? '<div style="color:var(--text-dim)">None — the dev API resolve endpoint has never been called successfully.</div>' :
+                d.recent_resolves.map(r => `<div style="padding:6px 8px;background:var(--surface-2);border-radius:var(--radius);font-size:12px">
+                  Ticket #${r.details.ticket_number || '?'} resolved by ${r.details.resolved_by || '?'} — ${timeAgo(r.at)}
+                </div>`).join('')}
+              <div><strong>Open tickets (${d.open_tickets.length}):</strong></div>
+              ${d.open_tickets.length === 0 ? '<div style="color:var(--success)">All tickets are closed!</div>' :
+                d.open_tickets.map(t => `<div style="padding:6px 8px;background:var(--surface-2);border-radius:var(--radius);font-size:12px">
+                  <a href="#/tickets/${t.id}" style="color:var(--accent)">#${t.ticket_number}</a> ${escapeHtml(t.title)}
+                  <span class="badge badge-blue" style="font-size:10px">${t.status}</span>
+                  — ${escapeHtml(t.project_name)} — updated ${timeAgo(t.updated_at)}
+                </div>`).join('')}
+            </div>
+          `;
+        } catch (err) {
+          el.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      });
 
       // Claude Code pairing
       const ccPairForm = $('#ccPairForm');
@@ -2028,33 +2071,55 @@
         });
       }
 
-      // Load tickets
-      try {
-        const ticketsRes = await api(`/admin/projects/${projectId}/tickets`);
-        const tickets = ticketsRes.data.tickets;
-        const tsEl = $('#ticketsSection');
-        if (!tsEl) return;
-        tsEl.innerHTML = tickets.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No tickets yet.</p>' : `
-          <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Updated</th></tr></thead>
-            <tbody>${tickets.map(t => `<tr data-ticket-href="#/tickets/${t.id}" style="cursor:pointer">
-              <td style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
-              <td style="color:var(--text)">${escapeHtml(t.title)}</td>
-              <td><span class="badge badge-gray">${t.type.replace(/_/g,' ')}</span></td>
-              <td><span class="badge ${t.priority==='high'||t.priority==='urgent'?'badge-red':t.priority==='medium'?'badge-yellow':'badge-gray'}">${t.priority}</span></td>
-              <td><span class="badge ${t.status==='open'?'badge-blue':t.status==='in_progress'?'badge-yellow':t.status==='completed'?'badge-green':'badge-gray'}">${t.status.replace(/_/g,' ')}</span></td>
-              <td>${escapeHtml(t.assigned_to_name || '-')}</td>
-              <td>${timeAgo(t.updated_at)}</td>
-            </tr>`).join('')}</tbody>
-          </table></div>
-        `;
-        $$('[data-ticket-href]').forEach(r => r.addEventListener('click', () => {
-          window.location.hash = r.dataset.ticketHref;
-        }));
-      } catch (e) {
-        const tsEl = $('#ticketsSection');
-        if (tsEl) tsEl.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
-      }
+      // Render tickets with inline status change
+      const loadProjectTickets = async () => {
+        try {
+          const ticketsRes = await api(`/admin/projects/${projectId}/tickets`);
+          const tickets = ticketsRes.data.tickets;
+          const tsEl = $('#ticketsSection');
+          if (!tsEl) return;
+          const statusClass = (s) => s==='open'?'badge-blue':s==='in_progress'?'badge-yellow':(s==='completed'||s==='closed')?'badge-green':'badge-gray';
+          tsEl.innerHTML = tickets.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No tickets yet.</p>' : `
+            <div class="table-wrap"><table>
+              <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Updated</th></tr></thead>
+              <tbody>${tickets.map(t => `<tr data-ticket-href="#/tickets/${t.id}" style="cursor:pointer">
+                <td style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
+                <td style="color:var(--text)">${escapeHtml(t.title)}</td>
+                <td><span class="badge badge-gray">${t.type.replace(/_/g,' ')}</span></td>
+                <td><span class="badge ${t.priority==='high'||t.priority==='urgent'?'badge-red':t.priority==='medium'?'badge-yellow':'badge-gray'}">${t.priority}</span></td>
+                <td>
+                  <select class="inline-ticket-status" data-ticket-id="${t.id}" style="padding:3px 6px;font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer">
+                    ${['open','in_progress','review','completed','closed'].map(s => `<option value="${s}" ${s===t.status?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}
+                  </select>
+                </td>
+                <td>${escapeHtml(t.assigned_to_name || '-')}</td>
+                <td>${timeAgo(t.updated_at)}</td>
+              </tr>`).join('')}</tbody>
+            </table></div>
+          `;
+          // Click to navigate to ticket detail (but not on the status dropdown)
+          $$('[data-ticket-href]').forEach(r => r.addEventListener('click', (e) => {
+            if (e.target.closest('.inline-ticket-status')) return;
+            window.location.hash = r.dataset.ticketHref;
+          }));
+          // Inline status change
+          $$('.inline-ticket-status').forEach(sel => sel.addEventListener('change', async (e) => {
+            e.stopPropagation();
+            const tid = sel.dataset.ticketId;
+            const newStatus = sel.value;
+            try {
+              await api(`/admin/tickets/${tid}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+              loadProjectTickets(); // Reload to confirm
+            } catch (err) { alert('Status update failed: ' + err.message); sel.value = sel.dataset.prev || 'open'; }
+          }));
+          // Store current value for rollback on error
+          $$('.inline-ticket-status').forEach(sel => { sel.dataset.prev = sel.value; });
+        } catch (e) {
+          const tsEl = $('#ticketsSection');
+          if (tsEl) tsEl.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
+        }
+      };
+      loadProjectTickets();
 
       // ===== CLAUDE CODE CHAT WIDGET =====
       if (cc.isConnected()) {
@@ -2348,32 +2413,8 @@
           ccShowSend();
 
           // Auto-refresh project data after Claude Code finishes (tickets/milestones may have changed)
-          setTimeout(async () => {
-            try {
-              // Refresh tickets table
-              const tsEl = $('#ticketsSection');
-              if (tsEl) {
-                const ticketsRes = await api(`/admin/projects/${projectId}/tickets`);
-                const tickets = ticketsRes.data.tickets;
-                tsEl.innerHTML = tickets.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No tickets yet.</p>' : `
-                  <div class="table-wrap"><table>
-                    <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Updated</th></tr></thead>
-                    <tbody>${tickets.map(t => `<tr data-ticket-href="#/tickets/${t.id}" style="cursor:pointer">
-                      <td style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
-                      <td style="color:var(--text)">${escapeHtml(t.title)}</td>
-                      <td><span class="badge badge-gray">${t.type.replace(/_/g,' ')}</span></td>
-                      <td><span class="badge ${t.priority==='high'||t.priority==='urgent'?'badge-red':t.priority==='medium'?'badge-yellow':'badge-gray'}">${t.priority}</span></td>
-                      <td><span class="badge ${t.status==='open'?'badge-blue':t.status==='in_progress'?'badge-yellow':t.status==='completed'||t.status==='closed'?'badge-green':'badge-gray'}">${t.status.replace(/_/g,' ')}</span></td>
-                      <td>${escapeHtml(t.assigned_to_name || '-')}</td>
-                      <td>${timeAgo(t.updated_at)}</td>
-                    </tr>`).join('')}</tbody>
-                  </table></div>
-                `;
-                $$('[data-ticket-href]').forEach(r => r.addEventListener('click', () => {
-                  window.location.hash = r.dataset.ticketHref;
-                }));
-              }
-            } catch {}
+          setTimeout(() => {
+            if ($('#ticketsSection')) loadProjectTickets();
           }, 2000);
         });
 
@@ -2603,12 +2644,17 @@
         </div>
       `;
 
-      // Status/priority change
+      // Status/priority change — re-render full page to confirm update took effect
       const updateTicket = async (field, value) => {
         try {
-          await api(`/admin/tickets/${ticketId}`, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
-          $('#ticketUpdateMsg').innerHTML = `<div class="alert alert-success" style="margin-bottom:12px">${field} updated</div>`;
-          setTimeout(() => { const el=$('#ticketUpdateMsg'); if(el) el.innerHTML=''; }, 2000);
+          const res = await api(`/admin/tickets/${ticketId}`, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
+          // Verify the server actually persisted the change
+          if (res.data.ticket && field === 'status' && res.data.ticket.status !== value) {
+            $('#ticketUpdateMsg').innerHTML = `<div class="alert alert-error" style="margin-bottom:12px">Status change failed — server still reports: ${res.data.ticket.status}</div>`;
+            return;
+          }
+          // Re-render to confirm the change is reflected
+          renderAdminTicketDetail(ticketId);
         } catch (err) { $('#ticketUpdateMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
       };
       $('#ticketStatus').addEventListener('change', (e) => updateTicket('status', e.target.value));

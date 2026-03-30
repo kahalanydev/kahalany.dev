@@ -812,7 +812,12 @@ router.patch('/tickets/:ticketId', (req, res) => {
   }
 
   values.push(ticket.id);
-  db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  const result = db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+  if (result.changes === 0) {
+    console.error(`[ADMIN] Ticket PATCH: 0 rows updated for ticket ${ticket.id}`);
+    return res.status(500).json({ success: false, error: 'Update failed — no rows changed' });
+  }
 
   if (status && status !== ticket.status) {
     logActivity(db, { projectId: ticket.project_id, userId: req.user.id, action: 'ticket_status_changed',
@@ -820,7 +825,9 @@ router.patch('/tickets/:ticketId', (req, res) => {
       details: { ticket_number: ticket.ticket_number, old_status: ticket.status, new_status: status }, ip: req.ip });
   }
 
-  res.json({ success: true, data: { message: 'Updated' } });
+  // Return updated ticket so frontend can verify
+  const updated = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticket.id);
+  res.json({ success: true, data: { message: 'Updated', ticket: updated } });
 });
 
 // POST /api/admin/tickets/:ticketId/comments — add comment (can be internal)
@@ -882,6 +889,27 @@ router.delete('/dev-keys/:keyId', requireRole('admin'), (req, res) => {
   const db = getDb();
   db.prepare('UPDATE dev_keys SET revoked = 1 WHERE key_id = ?').run(req.params.keyId);
   res.json({ success: true, data: { message: 'Key revoked' } });
+});
+
+// GET /api/admin/dev-api-status — diagnostic check for dev API health
+router.get('/dev-api-status', requireRole('admin'), (req, res) => {
+  const db = getDb();
+  const activeKeys = db.prepare("SELECT key_id, label, last_used_at, expires_at FROM dev_keys WHERE revoked = 0").all();
+  const recentResolves = db.prepare(`
+    SELECT a.details, a.created_at FROM activity_log a
+    WHERE a.action = 'ticket_resolved' ORDER BY a.created_at DESC LIMIT 5
+  `).all();
+  const openTickets = db.prepare("SELECT t.id, t.ticket_number, t.title, t.status, t.updated_at, p.name as project_name FROM tickets t JOIN projects p ON p.id = t.project_id WHERE t.status IN ('open','in_progress') ORDER BY t.created_at DESC LIMIT 20").all();
+
+  res.json({
+    success: true,
+    data: {
+      active_keys: activeKeys.length,
+      keys: activeKeys.map(k => ({ key_id: k.key_id, label: k.label, last_used: k.last_used_at, expires: k.expires_at })),
+      recent_resolves: recentResolves.map(r => ({ details: JSON.parse(r.details || '{}'), at: r.created_at })),
+      open_tickets: openTickets
+    }
+  });
 });
 
 module.exports = router;
