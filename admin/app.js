@@ -1611,81 +1611,85 @@
           </div>
         </div>
 
-        <!-- Plan (below grid) -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Project Plan</span>
-            <div style="display:flex;align-items:center;gap:8px">
-              ${plan ? `<span style="font-size:11px;color:var(--text-dim)">v${plan.version}</span>` : ''}
-              ${plan ? `<button class="btn btn-secondary btn-sm" id="planHistoryBtn">History</button>` : ''}
-              <button class="btn btn-secondary btn-sm" id="editPlanBtn">${plan ? 'Edit' : 'Create'} Plan</button>
-            </div>
-          </div>
-          <div id="planEditor" style="display:none;margin-bottom:16px">
-            <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px">
-              <button class="btn btn-sm planTabBtn active" data-tab="write" style="font-size:12px">Write</button>
-              <button class="btn btn-sm planTabBtn" data-tab="preview" style="font-size:12px">Preview</button>
-            </div>
-            <div id="planWriteTab">
-              <textarea id="planContent" style="width:100%;min-height:300px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;resize:vertical;line-height:1.6">${plan ? escapeHtml(plan.content) : ''}</textarea>
-            </div>
-            <div id="planPreviewTab" style="display:none;min-height:300px;padding:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px" class="md-rendered"></div>
-            <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-              <button class="btn btn-primary btn-sm" id="savePlanBtn">Save Plan</button>
-              ${['planning', 'proposed'].includes(project.status) && plan ? `<button class="btn btn-secondary btn-sm" id="proposePlanBtn" style="background:var(--success);border-color:var(--success);color:#fff">${project.status === 'proposed' ? 'Re-send to Client' : 'Send to Client'}</button>` : ''}
-              <span id="planMsg" style="font-size:12px"></span>
-            </div>
-          </div>
-          <div id="planVersionsPanel" style="display:none;margin-bottom:16px"></div>
-          ${plan ? `<div id="planDisplay" class="md-rendered" style="max-height:300px;overflow-y:auto;font-size:13px;line-height:1.6">${renderMarkdown(escapeHtml(plan.content))}</div>` :
-            '<p style="color:var(--text-dim);font-size:13px">No plan created yet.</p>'}
-        </div>
-
-        <!-- Members -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Project Members</span>
-            <button class="btn btn-secondary btn-sm" id="addMemberBtn">+ Add Member</button>
-          </div>
-          <div id="addMemberForm" style="display:none;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="text" id="memberSearch" placeholder="Search by name or email..." style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
-            </div>
-            <div id="memberSearchResults" style="margin-top:8px"></div>
-          </div>
-          ${members.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;padding:4px 0">No members assigned. Members from other organizations can be added here for cross-org access.</p>' :
-            members.map(m => `
-              <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface-3)">
-                <div style="width:32px;height:32px;border-radius:50%;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--text-dim)">${escapeHtml((m.name || '?')[0].toUpperCase())}</div>
-                <div style="flex:1">
-                  <div style="font-size:14px;font-weight:500">${escapeHtml(m.name)}</div>
-                  <div style="font-size:12px;color:var(--text-dim)">${escapeHtml(m.email)} <span class="badge badge-gray" style="font-size:10px">${m.user_role}</span> <span class="badge badge-blue" style="font-size:10px">${m.role}</span></div>
-                </div>
-                <button class="btn btn-danger btn-sm member-remove" data-user-id="${m.user_id}" data-name="${escapeHtml(m.name).replace(/"/g, '&quot;')}" style="padding:2px 8px;font-size:10px">\u2715</button>
+        <div class="grid-2">
+          <!-- Plan -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Project Plan</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                ${plan ? `<span style="font-size:11px;color:var(--text-dim)">v${plan.version}</span>` : ''}
+                ${plan ? `<button class="btn btn-secondary btn-sm" id="planHistoryBtn">History</button>` : ''}
+                <button class="btn btn-secondary btn-sm" id="editPlanBtn">${plan ? 'Edit' : 'Create'} Plan</button>
               </div>
-            `).join('')}
-        </div>
-
-        <!-- Tickets -->
-        <div class="card">
-          <div class="card-header"><span class="card-title">Tickets</span></div>
-          <div id="ticketsSection"><div class="loading"><div class="spinner"></div> Loading tickets...</div></div>
-        </div>
-
-        <!-- Activity -->
-        <div class="card">
-          <div class="card-header"><span class="card-title">Recent Activity</span></div>
-          ${recentActivity.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No activity yet.</p>' : `
-            <div style="max-height:300px;overflow-y:auto">
-              ${recentActivity.map(a => {
-                const d = a.details ? JSON.parse(a.details) : {};
-                return `<div style="padding:8px 0;border-bottom:1px solid var(--surface-3);font-size:13px;color:var(--text-secondary)">
-                  <strong>${escapeHtml(a.user_name || a.user_email || 'System')}</strong> — ${a.action.replace(/_/g, ' ')}
-                  <span style="float:right;color:var(--text-dim);font-size:11px">${timeAgo(a.created_at)}</span>
-                </div>`;
-              }).join('')}
             </div>
-          `}
+            <div id="planEditor" style="display:none;margin-bottom:16px">
+              <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px">
+                <button class="btn btn-sm planTabBtn active" data-tab="write" style="font-size:12px">Write</button>
+                <button class="btn btn-sm planTabBtn" data-tab="preview" style="font-size:12px">Preview</button>
+              </div>
+              <div id="planWriteTab">
+                <textarea id="planContent" style="width:100%;min-height:300px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;resize:vertical;line-height:1.6">${plan ? escapeHtml(plan.content) : ''}</textarea>
+              </div>
+              <div id="planPreviewTab" style="display:none;min-height:300px;padding:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px" class="md-rendered"></div>
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <button class="btn btn-primary btn-sm" id="savePlanBtn">Save Plan</button>
+                ${['planning', 'proposed'].includes(project.status) && plan ? `<button class="btn btn-secondary btn-sm" id="proposePlanBtn" style="background:var(--success);border-color:var(--success);color:#fff">${project.status === 'proposed' ? 'Re-send to Client' : 'Send to Client'}</button>` : ''}
+                <span id="planMsg" style="font-size:12px"></span>
+              </div>
+            </div>
+            <div id="planVersionsPanel" style="display:none;margin-bottom:16px"></div>
+            ${plan ? `<div id="planDisplay" class="md-rendered" style="max-height:300px;overflow-y:auto;font-size:13px;line-height:1.6">${renderMarkdown(escapeHtml(plan.content))}</div>` :
+              '<p style="color:var(--text-dim);font-size:13px">No plan created yet.</p>'}
+          </div>
+
+          <!-- Tickets -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">Tickets</span></div>
+            <div id="ticketsSection"><div class="loading"><div class="spinner"></div> Loading tickets...</div></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Members -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Project Members</span>
+              <button class="btn btn-secondary btn-sm" id="addMemberBtn">+ Add Member</button>
+            </div>
+            <div id="addMemberForm" style="display:none;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="memberSearch" placeholder="Search by name or email..." style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+              </div>
+              <div id="memberSearchResults" style="margin-top:8px"></div>
+            </div>
+            ${members.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;padding:4px 0">No members assigned. Members from other organizations can be added here for cross-org access.</p>' :
+              members.map(m => `
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface-3)">
+                  <div style="width:32px;height:32px;border-radius:50%;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--text-dim)">${escapeHtml((m.name || '?')[0].toUpperCase())}</div>
+                  <div style="flex:1">
+                    <div style="font-size:14px;font-weight:500">${escapeHtml(m.name)}</div>
+                    <div style="font-size:12px;color:var(--text-dim)">${escapeHtml(m.email)} <span class="badge badge-gray" style="font-size:10px">${m.user_role}</span> <span class="badge badge-blue" style="font-size:10px">${m.role}</span></div>
+                  </div>
+                  <button class="btn btn-danger btn-sm member-remove" data-user-id="${m.user_id}" data-name="${escapeHtml(m.name).replace(/"/g, '&quot;')}" style="padding:2px 8px;font-size:10px">\u2715</button>
+                </div>
+              `).join('')}
+          </div>
+
+          <!-- Activity -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">Recent Activity</span></div>
+            ${recentActivity.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No activity yet.</p>' : `
+              <div style="max-height:300px;overflow-y:auto">
+                ${recentActivity.map(a => {
+                  const d = a.details ? JSON.parse(a.details) : {};
+                  return `<div style="padding:8px 0;border-bottom:1px solid var(--surface-3);font-size:13px;color:var(--text-secondary)">
+                    <strong>${escapeHtml(a.user_name || a.user_email || 'System')}</strong> — ${a.action.replace(/_/g, ' ')}
+                    <span style="float:right;color:var(--text-dim);font-size:11px">${timeAgo(a.created_at)}</span>
+                  </div>`;
+                }).join('')}
+              </div>
+            `}
+          </div>
         </div>
 
       `;
