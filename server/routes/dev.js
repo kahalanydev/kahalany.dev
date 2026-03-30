@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDb, generateId, logActivity } = require('../db');
+const { getDb, generateId, logActivity, slugify } = require('../db');
 const { requireDevAuth, rateLimit } = require('../middleware/auth');
 const { sendTicketResolvedEmail } = require('../utils/email');
 
@@ -8,6 +8,42 @@ const router = express.Router();
 // All dev routes require HMAC-signed auth
 router.use(requireDevAuth);
 router.use(rateLimit(120, 60000)); // 120 req/min
+
+// POST /api/dev/bootstrap — create org + project in one call
+router.post('/bootstrap', (req, res) => {
+  const db = getDb();
+  const { org_name, org_email, project_name, project_description, tech_stack, live_url, start_date, target_date, status } = req.body;
+
+  if (!org_name || !project_name) {
+    return res.status(400).json({ success: false, error: 'org_name and project_name required' });
+  }
+
+  // Create or find org
+  let org = db.prepare('SELECT * FROM organizations WHERE name = ?').get(org_name);
+  if (!org) {
+    const orgId = generateId();
+    db.prepare('INSERT INTO organizations (id, name, primary_email) VALUES (?, ?, ?)').run(orgId, org_name, org_email || 'hello@kahalany.dev');
+    org = { id: orgId, name: org_name };
+  }
+
+  // Check if project already exists
+  const existing = db.prepare('SELECT * FROM projects WHERE name = ? AND org_id = ?').get(project_name, org.id);
+  if (existing) {
+    return res.json({ success: true, data: { org_id: org.id, project_id: existing.id, message: 'Project already exists' } });
+  }
+
+  const projectId = generateId();
+  const slug = slugify(project_name);
+  db.prepare(`
+    INSERT INTO projects (id, org_id, name, slug, description, tech_stack, live_url, start_date, target_date, status, progress_percent)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+  `).run(projectId, org.id, project_name, slug, project_description || null, tech_stack || null,
+    live_url || null, start_date || null, target_date || null, status || 'planning');
+
+  logActivity(db, { projectId, action: 'project_created', entityType: 'project', entityId: projectId, details: { name: project_name } });
+
+  res.json({ success: true, data: { org_id: org.id, project_id: projectId } });
+});
 
 // ===== SYNC =====
 
