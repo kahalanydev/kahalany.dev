@@ -23,20 +23,25 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for API calls, cache-first for static assets
+  // Let navigation requests (OAuth redirects, page loads) pass through untouched
+  if (e.request.mode === 'navigate') return;
+
+  // Network-first for API calls
   if (e.request.url.includes('/api/') || e.request.url.includes('/auth/')) {
     e.respondWith(
       fetch(e.request).catch(() => caches.match(e.request))
     );
-  } else {
-    e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(e.request))
-    );
+    return;
   }
+
+  // Stale-while-revalidate for static assets
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });

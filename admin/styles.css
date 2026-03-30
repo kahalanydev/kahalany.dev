@@ -691,7 +691,11 @@ table td .mono {
 }
 
 @media (max-width: 480px) {
-  .metrics-grid { grid-template-columns: 1fr; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
+  .metric-card { padding: 12px; }
+  .metric-label { font-size: 10px; margin-bottom: 4px; }
+  .metric-value { font-size: 22px; }
+  .metric-sub { font-size: 10px; }
   .login-card { padding: 24px; }
   .main { padding: 16px 10px; padding-top: 60px; }
   .mobile-cards td { font-size: 12px; }
