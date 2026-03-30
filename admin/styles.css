@@ -557,7 +557,8 @@ table td .mono {
 }
 
 .cc-messages {
-  height: 400px;
+  height: 350px;
+  max-height: 350px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);

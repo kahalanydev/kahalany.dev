@@ -282,9 +282,10 @@
       if (!key) return;
       try {
         const data = await this.api(`/api/history/${encodeURIComponent(key)}`);
-        this.chats[projectId] = (data.messages || []).map(m => ({
+        const all = (data.messages || []).map(m => ({
           role: m.role, content: m.content, tools: m.tools || [], timestamp: m.timestamp
         }));
+        this.chats[projectId] = all.slice(-20);
       } catch {
         if (!this.chats[projectId]) this.chats[projectId] = [];
       }
@@ -1597,7 +1598,7 @@
                 </div>
               ` : `
                 <div id="ccChatArea" style="flex:1;display:flex;flex-direction:column">
-                  <div id="ccMessages" class="cc-messages" style="flex:1;min-height:280px"></div>
+                  <div id="ccMessages" class="cc-messages"></div>
                   <div id="ccToolStatus" style="display:none;padding:8px 12px;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border);font-family:var(--mono)"></div>
                   <div style="display:flex;gap:8px;padding:12px 0 0">
                     <input type="text" id="ccMsgInput" placeholder="Ask Claude about this project..." style="flex:1;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
@@ -1969,7 +1970,7 @@
             html += `</div>`;
           }
           el.innerHTML = html;
-          el.scrollTop = el.scrollHeight;
+          requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
         }
 
         // Folder picker
