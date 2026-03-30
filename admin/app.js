@@ -1945,13 +1945,31 @@
                 </select>
               `;
               const sel = $('#ccFolderSelect');
-              if (sel) sel.addEventListener('change', () => {
-                if (!sel.value) return;
-                const map = cc.getProjectMap();
-                map[projectId] = sel.value;
-                cc.setProjectMap(map);
-                renderProjectDetail(projectId);
-              });
+              if (sel) {
+                // Auto-match folder to current project name
+                const pName = (project.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (pName && projects && projects.length) {
+                  const match = projects.find(p => {
+                    const fName = (p.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return fName === pName || fName.includes(pName) || pName.includes(fName);
+                  });
+                  if (match) {
+                    sel.value = match.path;
+                    const map = cc.getProjectMap();
+                    map[projectId] = match.path;
+                    cc.setProjectMap(map);
+                    renderProjectDetail(projectId);
+                    return;
+                  }
+                }
+                sel.addEventListener('change', () => {
+                  if (!sel.value) return;
+                  const map = cc.getProjectMap();
+                  map[projectId] = sel.value;
+                  cc.setProjectMap(map);
+                  renderProjectDetail(projectId);
+                });
+              }
             } catch (err) {
               const el = $('#ccHeaderActions');
               if (el) el.innerHTML = `<span style="color:var(--danger);font-size:11px">${escapeHtml(err.message)}</span>`;
