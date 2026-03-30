@@ -128,6 +128,43 @@
     return icons[status] || '\u25CB';
   }
 
+  function progressRing(percent, size = 100, stroke = 8) {
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const offset = c - (percent / 100) * c;
+    const color = percent >= 100 ? 'var(--success)' : 'var(--accent)';
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="progress-ring">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--surface-3)" stroke-width="${stroke}"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+        stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${offset}"
+        transform="rotate(-90 ${size/2} ${size/2})" style="transition:stroke-dashoffset 0.8s ease"/>
+      <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central"
+        style="font-size:${size * 0.24}px;font-weight:700;fill:var(--text);font-family:var(--mono)">${percent}%</text>
+    </svg>`;
+  }
+
+  function activityIcon(action) {
+    const map = {
+      project_created: '&#9733;', project_proposed: '&#9993;', project_approved: '&#10003;',
+      project_status_changed: '&#9881;', milestone_created: '&#9873;', milestone_status_changed: '&#9632;',
+      ticket_created: '&#9998;', ticket_status_changed: '&#8635;', comment_added: '&#128172;',
+      plan_updated: '&#128196;'
+    };
+    return map[action] || '&#8226;';
+  }
+
+  const phaseSteps = ['planning','proposed','approved','in_progress','review','completed'];
+  function phaseIndicator(status) {
+    const idx = phaseSteps.indexOf(status);
+    return `<div class="phase-bar">${phaseSteps.map((s, i) => `
+      <div class="phase-step ${i < idx ? 'done' : i === idx ? 'active' : ''}">
+        <div class="phase-dot">${i < idx ? '&#10003;' : i + 1}</div>
+        <div class="phase-label">${s.replace(/_/g, ' ')}</div>
+      </div>
+      ${i < phaseSteps.length - 1 ? `<div class="phase-line ${i < idx ? 'done' : ''}"></div>` : ''}
+    `).join('')}</div>`;
+  }
+
   function activityText(a) {
     const d = a.details ? (typeof a.details === 'string' ? JSON.parse(a.details) : a.details) : {};
     const who = a.user_name || 'System';
@@ -350,31 +387,49 @@
       const res = await api('/portal/dashboard');
       const { projects, recentActivity } = res.data;
 
+      const activeCount = projects.filter(p => ['in_progress','review'].includes(p.status)).length;
+      const pendingCount = projects.filter(p => p.status === 'proposed').length;
+      const summaryParts = [];
+      if (activeCount) summaryParts.push(`${activeCount} project${activeCount > 1 ? 's' : ''} active`);
+      if (pendingCount) summaryParts.push(`${pendingCount} awaiting your approval`);
+
       $('#mainContent').innerHTML = `
         <div class="page-header">
           <h1>Welcome${state.user?.name ? ', ' + escapeHtml(state.user.name) : ''}</h1>
-          <p>Your projects and recent activity</p>
+          <p>${summaryParts.length ? summaryParts.join(', ') : 'Your projects and recent activity'}</p>
         </div>
 
         ${projects.length === 0 ? `
           <div class="empty-state">
-            <div class="icon">\u{1F4CB}</div>
+            <div class="icon">&#128203;</div>
             <p>No projects yet. We'll set one up for you soon!</p>
           </div>
-        ` : projects.map(p => `
-          <div class="project-card" data-project-id="${p.id}">
-            <div class="project-card-header">
-              <span class="project-card-name">${escapeHtml(p.name)}</span>
-              ${statusBadge(p.status)}
+        ` : `<div class="hero-cards-grid">${projects.map(p => `
+          <div class="hero-card" data-project-id="${p.id}">
+            <div class="hero-card-top">
+              <div class="hero-card-info">
+                <div class="hero-card-name">${escapeHtml(p.name)}</div>
+                ${statusBadge(p.status)}
+              </div>
+              ${progressRing(p.progress_percent, 90, 7)}
             </div>
-            ${p.org_name ? `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${escapeHtml(p.org_name)}</div>` : ''}
-            <div class="progress-bar"><div class="progress-bar-fill" style="width:${p.progress_percent}%"></div></div>
-            <div class="progress-label" style="display:flex;justify-content:space-between">
-              <span>${p.progress_percent}% complete</span>
-              <span>${p.open_tickets} open ticket${p.open_tickets !== 1 ? 's' : ''}</span>
+            <div class="hero-card-details">
+              <div class="hero-card-ms">
+                <div class="hero-card-ms-dots">
+                  ${Array.from({length: p.milestones_total || 0}, (_, i) =>
+                    `<span class="ms-dot ${i < p.milestones_done ? 'done' : ''}"></span>`
+                  ).join('')}
+                </div>
+                <span class="hero-card-ms-label">${p.milestones_done}/${p.milestones_total} milestones</span>
+              </div>
+              ${p.next_milestone ? `<div class="hero-card-next">Up next: <strong>${escapeHtml(p.next_milestone)}</strong></div>` : ''}
+              <div class="hero-card-footer">
+                ${p.days_remaining !== null ? `<span class="hero-card-countdown ${p.days_remaining < 0 ? 'overdue' : ''}">${p.days_remaining < 0 ? Math.abs(p.days_remaining) + 'd overdue' : p.days_remaining + 'd remaining'}</span>` : ''}
+                ${p.open_tickets > 0 ? `<span class="badge badge-yellow" style="font-size:11px">${p.open_tickets} open ticket${p.open_tickets !== 1 ? 's' : ''}</span>` : ''}
+              </div>
             </div>
           </div>
-        `).join('')}
+        `).join('')}</div>`}
 
         ${recentActivity.length > 0 ? `
           <div class="card" style="margin-top:24px">
@@ -382,7 +437,7 @@
             <ul class="activity-list">
               ${recentActivity.slice(0, 10).map(a => `
                 <li class="activity-item">
-                  <div class="activity-dot"></div>
+                  <div class="activity-icon">${activityIcon(a.action)}</div>
                   <div class="activity-text">${activityText(a)}</div>
                   <div class="activity-time">${timeAgo(a.created_at)}</div>
                 </li>
@@ -392,7 +447,7 @@
         ` : ''}
       `;
 
-      $$('.project-card').forEach(card => card.addEventListener('click', () => {
+      $$('.hero-card').forEach(card => card.addEventListener('click', () => {
         window.location.hash = `#/project/${card.dataset.projectId}`;
       }));
     } catch (err) {
@@ -410,12 +465,16 @@
       const { project, milestones, open_tickets, recentActivity } = res.data;
 
       const showPlanApproval = project.status === 'proposed';
+      const msDone = milestones.filter(m => m.status === 'completed').length;
 
       $('#mainContent').innerHTML = `
         <div class="page-header">
           <h1>${escapeHtml(project.name)}</h1>
           <p>${escapeHtml(project.description || '')}</p>
         </div>
+
+        <!-- Phase indicator -->
+        ${phaseIndicator(project.status)}
 
         ${showPlanApproval ? `
           <div class="alert alert-info" style="margin-bottom:24px">
@@ -424,41 +483,57 @@
           </div>
         ` : ''}
 
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Progress</span>
-            ${statusBadge(project.status)}
+        <!-- Progress + Stats -->
+        <div class="project-overview-card">
+          <div class="project-overview-ring">
+            ${progressRing(project.progress_percent, 120, 9)}
           </div>
-          <div class="progress-bar" style="height:12px;margin-bottom:12px">
-            <div class="progress-bar-fill" style="width:${project.progress_percent}%"></div>
+          <div class="project-overview-stats">
+            <div class="stat-item">
+              <div class="stat-value accent">${msDone}/${milestones.length}</div>
+              <div class="stat-label">Milestones</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value${open_tickets > 0 ? ' warning' : ''}">${open_tickets}</div>
+              <div class="stat-label">Open Tickets</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${project.days_since_start !== null ? project.days_since_start : '-'}</div>
+              <div class="stat-label">Days Active</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value${project.days_remaining !== null && project.days_remaining < 0 ? ' danger' : ''}">${project.days_remaining !== null ? (project.days_remaining < 0 ? Math.abs(project.days_remaining) + ' over' : project.days_remaining) : '-'}</div>
+              <div class="stat-label">${project.days_remaining !== null && project.days_remaining < 0 ? 'Days Overdue' : 'Days Left'}</div>
+            </div>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary)">
-            <span>${project.progress_percent}% complete</span>
-            <span>${open_tickets} open ticket${open_tickets !== 1 ? 's' : ''}</span>
-          </div>
-          ${project.target_date ? `<div style="font-size:12px;color:var(--text-dim);margin-top:8px">Target: ${formatDate(project.target_date)}</div>` : ''}
         </div>
 
+        <!-- Visual Milestone Timeline -->
         <div class="card">
           <div class="card-header"><span class="card-title">Milestones</span></div>
           ${milestones.length === 0 ? '<p style="color:var(--text-dim);font-size:14px">No milestones defined yet.</p>' : `
-            <ul class="milestone-list">
-              ${milestones.map(m => `
-                <li class="milestone-item">
-                  <div class="milestone-icon ${m.status}">${milestoneIcon(m.status)}</div>
-                  <div class="milestone-content">
-                    <div class="milestone-title">${escapeHtml(m.title)}</div>
-                    ${m.description ? `<div class="milestone-desc">${escapeHtml(m.description)}</div>` : ''}
-                    <div class="milestone-meta">
-                      ${statusBadge(m.status)}
-                      ${m.target_date ? ` \u2022 Target: ${formatDate(m.target_date)}` : ''}
-                      ${m.completed_date ? ` \u2022 Completed: ${formatDate(m.completed_date)}` : ''}
+            <div class="timeline">
+              ${milestones.map((m, i) => `
+                <div class="timeline-item">
+                  <div class="timeline-track">
+                    <div class="timeline-node ${m.status}">
+                      ${m.status === 'completed' ? '&#10003;' : m.status === 'in_progress' ? '' : ''}
                     </div>
-                    ${m.completion_notes ? `<div class="milestone-notes">${escapeHtml(m.completion_notes)}</div>` : ''}
+                    ${i < milestones.length - 1 ? `<div class="timeline-connector ${m.status === 'completed' ? 'done' : ''}"></div>` : ''}
                   </div>
-                </li>
+                  <div class="timeline-content">
+                    <div class="timeline-title">${escapeHtml(m.title)}</div>
+                    ${m.description ? `<div class="timeline-desc">${escapeHtml(m.description)}</div>` : ''}
+                    <div class="timeline-meta">
+                      ${statusBadge(m.status)}
+                      ${m.target_date ? ` <span class="timeline-date">Target: ${formatDate(m.target_date)}</span>` : ''}
+                      ${m.completed_date ? ` <span class="timeline-date">Completed: ${formatDate(m.completed_date)}</span>` : ''}
+                    </div>
+                    ${m.completion_notes ? `<div class="timeline-notes">${escapeHtml(m.completion_notes)}</div>` : ''}
+                  </div>
+                </div>
               `).join('')}
-            </ul>
+            </div>
           `}
         </div>
 
@@ -473,7 +548,7 @@
             <ul class="activity-list">
               ${recentActivity.map(a => `
                 <li class="activity-item">
-                  <div class="activity-dot"></div>
+                  <div class="activity-icon">${activityIcon(a.action)}</div>
                   <div class="activity-text">${activityText(a)}</div>
                   <div class="activity-time">${timeAgo(a.created_at)}</div>
                 </li>

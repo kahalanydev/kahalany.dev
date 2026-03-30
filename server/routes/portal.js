@@ -36,6 +36,22 @@ router.get('/dashboard', (req, res) => {
     ORDER BY p.updated_at DESC
   `).all(userId, orgId || null, orgId || null);
 
+  // Enrich each project with milestone summary
+  projects.forEach(p => {
+    const ms = db.prepare('SELECT id, title, status, target_date FROM milestones WHERE project_id = ? ORDER BY sort_order').all(p.id);
+    p.milestones_total = ms.length;
+    p.milestones_done = ms.filter(m => m.status === 'completed').length;
+    const next = ms.find(m => m.status === 'in_progress') || ms.find(m => m.status === 'upcoming');
+    p.next_milestone = next ? next.title : null;
+    // Days remaining to target
+    if (p.target_date) {
+      const diff = Math.ceil((new Date(p.target_date) - new Date()) / 86400000);
+      p.days_remaining = diff;
+    } else {
+      p.days_remaining = null;
+    }
+  });
+
   // Activity for all visible projects
   const projectIds = projects.map(p => p.id);
   const recentActivity = projectIds.length > 0
@@ -71,6 +87,11 @@ router.get('/projects/:projectId', enforceOrgScope, (req, res) => {
     ORDER BY a.created_at DESC LIMIT 15
   `).all(project.id);
 
+  // Days since start / days remaining
+  let daysSinceStart = null, daysRemaining = null;
+  if (project.start_date) daysSinceStart = Math.max(0, Math.ceil((new Date() - new Date(project.start_date)) / 86400000));
+  if (project.target_date) daysRemaining = Math.ceil((new Date(project.target_date) - new Date()) / 86400000);
+
   res.json({
     success: true,
     data: {
@@ -79,7 +100,8 @@ router.get('/projects/:projectId', enforceOrgScope, (req, res) => {
         status: project.status, progress_percent: project.progress_percent,
         tech_stack: project.tech_stack, live_url: project.live_url,
         start_date: project.start_date, target_date: project.target_date,
-        completed_date: project.completed_date
+        completed_date: project.completed_date,
+        days_since_start: daysSinceStart, days_remaining: daysRemaining
       },
       milestones,
       open_tickets: openTickets,
