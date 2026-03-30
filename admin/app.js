@@ -2112,13 +2112,13 @@
             const icon = m.status === 'completed' ? '✅' : m.status === 'in_progress' ? '🔄' : '⬚';
             ctx += `${i + 1}. ${icon} ${m.title} (${m.status})\n`;
           });
-          // Include open tickets if loaded
+          // Include only recent open tickets (max 5)
           try {
             const ticketsEl = $('#ticketsSection');
             if (ticketsEl) {
-              const rows = ticketsEl.querySelectorAll('tr[data-ticket-href]');
+              const rows = [...ticketsEl.querySelectorAll('tr[data-ticket-href]')].slice(0, 5);
               if (rows.length > 0) {
-                ctx += `\nOpen Tickets:\n`;
+                ctx += `\nRecent Tickets:\n`;
                 rows.forEach(r => {
                   const cells = r.querySelectorAll('td');
                   if (cells.length >= 5) {
@@ -2128,9 +2128,6 @@
               }
             }
           } catch {}
-          if (plan && plan.content) {
-            ctx += `\nProject Plan:\n${plan.content.substring(0, 2000)}\n`;
-          }
           ctx += `[End Portal Context]\n\n`;
           return ctx;
         }
