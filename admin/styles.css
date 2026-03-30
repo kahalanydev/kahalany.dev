@@ -642,13 +642,10 @@ table td .mono {
 
 .cc-thinking::after {
   content: '...';
-  display: inline-block;
-  overflow: hidden;
-  width: 0;
-  vertical-align: bottom;
-  animation: ccDots 1.2s steps(4, end) infinite;
+  animation: ccPulse 1.4s ease-in-out infinite;
 }
 
-@keyframes ccDots {
-  to { width: 1.2em; }
+@keyframes ccPulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
 }

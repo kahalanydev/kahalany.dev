@@ -1919,7 +1919,7 @@
           // Streaming message
           if (streaming.active || streaming.text) {
             html += `<div class="cc-msg cc-msg-assistant"><div class="cc-msg-bubble cc-msg-assistant-bubble">${
-              streaming.text ? renderMarkdown(escapeHtml(streaming.text)) : '<span class="cc-thinking">Thinking...</span>'
+              streaming.text ? renderMarkdown(escapeHtml(streaming.text)) : '<span class="cc-thinking">Thinking</span>'
             }</div>`;
             if (streaming.tools.length) {
               html += `<div class="cc-tools">${streaming.tools.map(t => `<span class="cc-tool-badge">${escapeHtml(t)}</span>`).join('')}</div>`;
@@ -2018,16 +2018,15 @@
         cc.on('claude:done', (msg) => {
           if (msg.key !== ccKey) return;
           const streaming = cc.streaming[projectId];
-          if (streaming.text || msg.output) {
-            cc.chats[projectId].push({
-              role: 'assistant',
-              content: streaming.text || msg.output || '',
-              tools: [...streaming.tools]
-            });
+          if (!streaming.active && !streaming.text) return; // Already processed
+          const content = streaming.text || msg.output || '';
+          const tools = [...streaming.tools];
+          cc.streaming[projectId] = { text: '', tools: [], active: false };
+          if (content) {
+            cc.chats[projectId].push({ role: 'assistant', content, tools });
           } else if (msg.error) {
             cc.chats[projectId].push({ role: 'assistant', content: `Error: ${msg.error}`, tools: [] });
           }
-          cc.streaming[projectId] = { text: '', tools: [], active: false };
           const sendBtn = $('#ccSendBtn');
           const stopBtn = $('#ccStopBtn');
           if (sendBtn) sendBtn.style.display = '';
