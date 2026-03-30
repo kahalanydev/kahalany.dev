@@ -137,6 +137,168 @@
     return html;
   }
 
+  // ===== CLAUDE CODE INTEGRATION =====
+  const cc = {
+    getServer: () => localStorage.getItem('cc_server_url') || '',
+    getToken: () => localStorage.getItem('cc_access_token') || '',
+    getRefresh: () => localStorage.getItem('cc_refresh_token') || '',
+    getProjectMap() { try { return JSON.parse(localStorage.getItem('cc_project_map') || '{}'); } catch { return {}; } },
+    setProjectMap(map) { localStorage.setItem('cc_project_map', JSON.stringify(map)); },
+    isConnected() { return !!(this.getServer() && this.getToken()); },
+
+    // In-memory chat state
+    chats: {},       // { projectId: [{ role, content, tools }] }
+    streaming: {},   // { projectId: { text, tools, active } }
+
+    // Token refresh with dedup
+    _refreshPromise: null,
+    async refreshToken() {
+      if (this._refreshPromise) return this._refreshPromise;
+      this._refreshPromise = (async () => {
+        try {
+          const res = await fetch(`${this.getServer()}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken: this.getRefresh() })
+          });
+          if (!res.ok) throw new Error('Session expired');
+          const data = await res.json();
+          localStorage.setItem('cc_access_token', data.token);
+          if (data.refreshToken) localStorage.setItem('cc_refresh_token', data.refreshToken);
+          return data.token;
+        } catch (e) {
+          localStorage.removeItem('cc_access_token');
+          localStorage.removeItem('cc_refresh_token');
+          throw e;
+        } finally { this._refreshPromise = null; }
+      })();
+      return this._refreshPromise;
+    },
+
+    // Authenticated fetch to CC server
+    async api(path, opts = {}) {
+      const server = this.getServer();
+      if (!server) throw new Error('Not connected');
+      opts.headers = { ...opts.headers };
+      opts.headers['Authorization'] = `Bearer ${this.getToken()}`;
+      if (opts.body && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
+      let res = await fetch(`${server}${path}`, opts);
+      if (res.status === 401) {
+        const token = await this.refreshToken();
+        opts.headers['Authorization'] = `Bearer ${token}`;
+        res = await fetch(`${server}${path}`, opts);
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+      return data;
+    },
+
+    // Pairing flow
+    async pair(serverUrl, code) {
+      const url = serverUrl.replace(/\/+$/, '');
+      const res = await fetch(`${url}/api/auth/pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pairingCode: code, deviceName: 'Kahalany Admin Panel' })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Pairing failed');
+      }
+      const data = await res.json();
+      localStorage.setItem('cc_server_url', url);
+      localStorage.setItem('cc_access_token', data.token);
+      localStorage.setItem('cc_refresh_token', data.refreshToken);
+      return data;
+    },
+
+    disconnect() {
+      this.disconnectWs();
+      localStorage.removeItem('cc_server_url');
+      localStorage.removeItem('cc_access_token');
+      localStorage.removeItem('cc_refresh_token');
+      localStorage.removeItem('cc_project_map');
+      this.chats = {};
+      this.streaming = {};
+    },
+
+    // WebSocket
+    ws: null,
+    _wsListeners: new Map(),
+    _wsReconnect: null,
+
+    connectWs() {
+      if (this.ws && this.ws.readyState <= 1) return;
+      const server = this.getServer();
+      if (!server || !this.getToken()) return;
+      try { this.ws = new WebSocket(server.replace(/^http/, 'ws') + '/ws'); } catch { return; }
+      this.ws.onopen = async () => {
+        // Refresh token if needed before authenticating
+        let token = this.getToken();
+        try {
+          const test = await fetch(`${server}/api/claude/status/test`, { headers: { 'Authorization': `Bearer ${token}` } });
+          if (test.status === 401) token = await this.refreshToken();
+        } catch {}
+        this.ws.send(JSON.stringify({ type: 'auth', token }));
+      };
+      this.ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          const cbs = this._wsListeners.get(msg.type);
+          if (cbs) cbs.forEach(cb => cb(msg));
+        } catch {}
+      };
+      this.ws.onclose = () => {
+        this.ws = null;
+        this._wsReconnect = setTimeout(() => this.connectWs(), 3000);
+      };
+      this.ws.onerror = () => {};
+    },
+
+    disconnectWs() {
+      if (this._wsReconnect) { clearTimeout(this._wsReconnect); this._wsReconnect = null; }
+      if (this.ws) { this.ws.close(); this.ws = null; }
+      this._wsListeners.clear();
+    },
+
+    on(event, cb) {
+      if (!this._wsListeners.has(event)) this._wsListeners.set(event, new Set());
+      this._wsListeners.get(event).add(cb);
+      return cb;
+    },
+    off(event, cb) { const s = this._wsListeners.get(event); if (s) s.delete(cb); },
+
+    // Get CC key for a portal project
+    keyFor(projectId) { return `portal-${projectId}`; },
+
+    // Send message to Claude via CC server
+    async send(projectId, message, projectPath) {
+      const key = this.keyFor(projectId);
+      const body = { key, message, projectPath };
+      return this.api('/api/claude/send', { method: 'POST', body: JSON.stringify(body) });
+    },
+
+    async stop(projectId) {
+      const key = this.keyFor(projectId);
+      return this.api('/api/claude/stop', { method: 'POST', body: JSON.stringify({ key }) });
+    },
+
+    async reset(projectId) {
+      const key = this.keyFor(projectId);
+      return this.api('/api/claude/reset', { method: 'POST', body: JSON.stringify({ key }) });
+    },
+
+    async isRunning(projectId) {
+      const key = this.keyFor(projectId);
+      const res = await this.api(`/api/claude/status/${encodeURIComponent(key)}`);
+      return res.running;
+    },
+
+    async listProjects() {
+      return this.api('/api/projects');
+    }
+  };
+
   // ===== CHART HELPERS =====
   const chartDefaults = {
     responsive: true,
@@ -965,6 +1127,41 @@
             <div id="devKeyResult" style="margin-top:12px"></div>
           </div>
         </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
+            <span class="card-title">Claude Code</span>
+            ${cc.isConnected() ? '<span class="badge badge-green">Connected</span>' : '<span class="badge badge-gray">Not connected</span>'}
+          </div>
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+            Connect your Claude Code server to get AI assistance directly from project pages.
+          </p>
+          <div id="ccMsg"></div>
+          ${cc.isConnected() ? `
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius)">
+              <span style="color:var(--success);font-size:8px">&#11044;</span>
+              <code style="font-family:var(--mono);font-size:13px;color:var(--text-secondary);flex:1">${escapeHtml(cc.getServer())}</code>
+              <button class="btn btn-danger btn-sm" id="ccDisconnectBtn">Disconnect</button>
+            </div>
+          ` : `
+            <form id="ccPairForm">
+              <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
+                <div class="form-group" style="margin-bottom:0">
+                  <label>Server URL</label>
+                  <input type="url" id="ccServerUrl" value="https://code.kahalany.dev" placeholder="https://code.kahalany.dev" style="font-family:var(--mono);font-size:12px">
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                  <label>Pairing Code</label>
+                  <input type="text" id="ccPairCode" placeholder="000000" maxlength="6" style="font-family:var(--mono);font-size:16px;text-align:center;letter-spacing:4px">
+                </div>
+              </div>
+              <p style="color:var(--text-dim);font-size:12px;margin-bottom:12px">
+                Open Claude Code Desktop &rarr; the 6-digit pairing code is shown on startup or in the health endpoint.
+              </p>
+              <button type="submit" class="btn btn-primary" style="width:auto">Connect</button>
+            </form>
+          `}
+        </div>
       `;
 
       // Change password handler
@@ -1137,6 +1334,32 @@
           $('#devKeysMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
       }));
+
+      // Claude Code pairing
+      const ccPairForm = $('#ccPairForm');
+      if (ccPairForm) {
+        ccPairForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const url = $('#ccServerUrl').value.trim();
+          const code = $('#ccPairCode').value.trim();
+          if (!url || !code) return;
+          try {
+            await cc.pair(url, code);
+            $('#ccMsg').innerHTML = '<div class="alert alert-success">Connected to Claude Code server!</div>';
+            setTimeout(() => renderSettings(), 1500);
+          } catch (err) {
+            $('#ccMsg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+          }
+        });
+      }
+      const ccDisconnectBtn = $('#ccDisconnectBtn');
+      if (ccDisconnectBtn) {
+        ccDisconnectBtn.addEventListener('click', () => {
+          if (!confirm('Disconnect from Claude Code server?')) return;
+          cc.disconnect();
+          renderSettings();
+        });
+      }
     } catch (err) {
       $('#mainContent').innerHTML = `<div class="alert alert-error">Failed to load settings: ${escapeHtml(err.message)}</div>`;
     }
@@ -1397,6 +1620,34 @@
             </div>
           `}
         </div>
+
+        <!-- Claude Code -->
+        <div class="card cc-card">
+          <div class="card-header">
+            <span class="card-title" style="display:flex;align-items:center;gap:8px">
+              <span style="font-family:var(--mono);font-size:14px;color:var(--accent)">&gt;_</span> Claude Code
+            </span>
+            <div style="display:flex;align-items:center;gap:8px" id="ccHeaderActions"></div>
+          </div>
+          <div id="ccWidgetBody">
+            ${!cc.isConnected() ? `
+              <div style="text-align:center;padding:24px;color:var(--text-dim)">
+                <p style="margin-bottom:12px">Connect your Claude Code server to use AI here.</p>
+                <a href="#/settings" class="btn btn-secondary btn-sm" style="text-decoration:none">Configure in Settings</a>
+              </div>
+            ` : `
+              <div id="ccChatArea">
+                <div id="ccMessages" class="cc-messages"></div>
+                <div id="ccToolStatus" style="display:none;padding:8px 12px;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border);font-family:var(--mono)"></div>
+                <div style="display:flex;gap:8px;padding:12px 0 0">
+                  <input type="text" id="ccMsgInput" placeholder="Ask Claude about this project..." style="flex:1;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+                  <button class="btn btn-primary btn-sm" id="ccSendBtn" style="width:auto;padding:10px 20px">Send</button>
+                  <button class="btn btn-danger btn-sm" id="ccStopBtn" style="width:auto;padding:10px 14px;display:none">Stop</button>
+                </div>
+              </div>
+            `}
+          </div>
+        </div>
       `;
 
       // Status change handler
@@ -1615,6 +1866,213 @@
         const tsEl = $('#ticketsSection');
         if (tsEl) tsEl.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
       }
+
+      // ===== CLAUDE CODE CHAT WIDGET =====
+      if (cc.isConnected()) {
+        const ccKey = cc.keyFor(projectId);
+        const projectMap = cc.getProjectMap();
+        const mappedPath = projectMap[projectId];
+
+        // Init chat state
+        if (!cc.chats[projectId]) cc.chats[projectId] = [];
+        if (!cc.streaming[projectId]) cc.streaming[projectId] = { text: '', tools: [], active: false };
+
+        // Render header actions (folder selector)
+        const headerActions = $('#ccHeaderActions');
+        if (headerActions) {
+          if (mappedPath) {
+            headerActions.innerHTML = `
+              <code style="font-size:11px;color:var(--text-dim);font-family:var(--mono);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(mappedPath)}">${escapeHtml(mappedPath.split('\\').pop() || mappedPath.split('/').pop())}</code>
+              <button class="btn btn-secondary btn-sm" id="ccRemapBtn" style="font-size:10px;padding:4px 8px">Change</button>
+              <button class="btn btn-secondary btn-sm" id="ccResetBtn" style="font-size:10px;padding:4px 8px" title="New conversation">Reset</button>
+            `;
+          } else {
+            headerActions.innerHTML = '<span class="badge badge-yellow" style="font-size:10px">No folder mapped</span>';
+          }
+        }
+
+        // Render messages
+        function renderCcChat() {
+          const el = $('#ccMessages');
+          if (!el) return;
+          const messages = cc.chats[projectId] || [];
+          const streaming = cc.streaming[projectId];
+          let html = '';
+          if (messages.length === 0 && !streaming.active) {
+            html = `<div style="text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px">
+              ${mappedPath ? 'Ask Claude anything about this project.' : 'Select a project folder above to get started.'}
+            </div>`;
+          }
+          messages.forEach(m => {
+            if (m.role === 'user') {
+              html += `<div class="cc-msg cc-msg-user"><div class="cc-msg-bubble cc-msg-user-bubble">${escapeHtml(m.content)}</div></div>`;
+            } else {
+              html += `<div class="cc-msg cc-msg-assistant"><div class="cc-msg-bubble cc-msg-assistant-bubble">${renderMarkdown(escapeHtml(m.content))}</div>`;
+              if (m.tools && m.tools.length) {
+                html += `<div class="cc-tools">${m.tools.map(t => `<span class="cc-tool-badge">${escapeHtml(t)}</span>`).join('')}</div>`;
+              }
+              html += `</div>`;
+            }
+          });
+          // Streaming message
+          if (streaming.active || streaming.text) {
+            html += `<div class="cc-msg cc-msg-assistant"><div class="cc-msg-bubble cc-msg-assistant-bubble">${
+              streaming.text ? renderMarkdown(escapeHtml(streaming.text)) : '<span class="cc-thinking">Thinking...</span>'
+            }</div>`;
+            if (streaming.tools.length) {
+              html += `<div class="cc-tools">${streaming.tools.map(t => `<span class="cc-tool-badge">${escapeHtml(t)}</span>`).join('')}</div>`;
+            }
+            html += `</div>`;
+          }
+          el.innerHTML = html;
+          el.scrollTop = el.scrollHeight;
+        }
+
+        // Folder picker
+        if (!mappedPath) {
+          // Load available folders from CC server
+          (async () => {
+            try {
+              const projects = await cc.listProjects();
+              const el = $('#ccHeaderActions');
+              if (!el) return;
+              el.innerHTML = `
+                <select id="ccFolderSelect" style="padding:4px 8px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;font-family:var(--mono);max-width:200px">
+                  <option value="">Select folder...</option>
+                  ${(projects || []).map(p => `<option value="${escapeHtml(p.path)}">${escapeHtml(p.name)}</option>`).join('')}
+                </select>
+              `;
+              const sel = $('#ccFolderSelect');
+              if (sel) sel.addEventListener('change', () => {
+                if (!sel.value) return;
+                const map = cc.getProjectMap();
+                map[projectId] = sel.value;
+                cc.setProjectMap(map);
+                renderProjectDetail(projectId);
+              });
+            } catch (err) {
+              const el = $('#ccHeaderActions');
+              if (el) el.innerHTML = `<span style="color:var(--danger);font-size:11px">${escapeHtml(err.message)}</span>`;
+            }
+          })();
+        }
+
+        renderCcChat();
+
+        // Connect WS
+        cc.disconnectWs();
+        cc.connectWs();
+
+        // WS event handlers
+        cc.on('claude:stream', (msg) => {
+          if (msg.key !== ccKey) return;
+          cc.streaming[projectId].text = msg.text || '';
+          cc.streaming[projectId].active = true;
+          renderCcChat();
+          const sendBtn = $('#ccSendBtn');
+          const stopBtn = $('#ccStopBtn');
+          if (sendBtn) sendBtn.style.display = 'none';
+          if (stopBtn) stopBtn.style.display = '';
+        });
+
+        cc.on('claude:tool-use', (msg) => {
+          if (msg.key !== ccKey) return;
+          const toolName = msg.tool || 'tool';
+          if (!cc.streaming[projectId].tools.includes(toolName)) {
+            cc.streaming[projectId].tools.push(toolName);
+          }
+          const toolEl = $('#ccToolStatus');
+          if (toolEl) {
+            toolEl.style.display = '';
+            toolEl.textContent = `Using ${toolName}...`;
+          }
+          renderCcChat();
+        });
+
+        cc.on('claude:tool-result', (msg) => {
+          if (msg.key !== ccKey) return;
+          const toolEl = $('#ccToolStatus');
+          if (toolEl) toolEl.style.display = 'none';
+        });
+
+        cc.on('claude:done', (msg) => {
+          if (msg.key !== ccKey) return;
+          const streaming = cc.streaming[projectId];
+          if (streaming.text || msg.output) {
+            cc.chats[projectId].push({
+              role: 'assistant',
+              content: streaming.text || msg.output || '',
+              tools: [...streaming.tools]
+            });
+          } else if (msg.error) {
+            cc.chats[projectId].push({ role: 'assistant', content: `Error: ${msg.error}`, tools: [] });
+          }
+          cc.streaming[projectId] = { text: '', tools: [], active: false };
+          const sendBtn = $('#ccSendBtn');
+          const stopBtn = $('#ccStopBtn');
+          if (sendBtn) sendBtn.style.display = '';
+          if (stopBtn) stopBtn.style.display = 'none';
+          const toolEl = $('#ccToolStatus');
+          if (toolEl) toolEl.style.display = 'none';
+          renderCcChat();
+        });
+
+        // Send message
+        async function ccSendMessage() {
+          const input = $('#ccMsgInput');
+          if (!input) return;
+          const msg = input.value.trim();
+          if (!msg || !mappedPath) return;
+          input.value = '';
+
+          cc.chats[projectId].push({ role: 'user', content: msg });
+          cc.streaming[projectId] = { text: '', tools: [], active: true };
+          renderCcChat();
+          // Hide send, show stop immediately
+          const sendBtn = $('#ccSendBtn');
+          const stopBtn = $('#ccStopBtn');
+          if (sendBtn) sendBtn.style.display = 'none';
+          if (stopBtn) stopBtn.style.display = '';
+
+          try {
+            await cc.send(projectId, msg, mappedPath);
+          } catch (err) {
+            cc.streaming[projectId] = { text: '', tools: [], active: false };
+            cc.chats[projectId].push({ role: 'assistant', content: `Connection error: ${err.message}`, tools: [] });
+            renderCcChat();
+            const sendBtn = $('#ccSendBtn');
+            const stopBtn = $('#ccStopBtn');
+            if (sendBtn) sendBtn.style.display = '';
+            if (stopBtn) stopBtn.style.display = 'none';
+          }
+        }
+
+        const ccSendBtn = $('#ccSendBtn');
+        if (ccSendBtn) ccSendBtn.addEventListener('click', ccSendMessage);
+        const ccInput = $('#ccMsgInput');
+        if (ccInput) ccInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ccSendMessage(); }
+        });
+        const ccStopBtn = $('#ccStopBtn');
+        if (ccStopBtn) ccStopBtn.addEventListener('click', async () => {
+          try { await cc.stop(projectId); } catch {}
+        });
+        const ccRemapBtn = $('#ccRemapBtn');
+        if (ccRemapBtn) ccRemapBtn.addEventListener('click', () => {
+          const map = cc.getProjectMap();
+          delete map[projectId];
+          cc.setProjectMap(map);
+          renderProjectDetail(projectId);
+        });
+        const ccResetBtn = $('#ccResetBtn');
+        if (ccResetBtn) ccResetBtn.addEventListener('click', async () => {
+          cc.chats[projectId] = [];
+          cc.streaming[projectId] = { text: '', tools: [], active: false };
+          try { await cc.reset(projectId); } catch {}
+          renderCcChat();
+        });
+      }
+
     } catch (err) {
       $('#mainContent').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
     }

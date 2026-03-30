@@ -550,3 +550,105 @@ table td .mono {
   .metrics-grid { grid-template-columns: 1fr; }
   .login-card { padding: 24px; }
 }
+
+/* ===== CLAUDE CODE CHAT WIDGET ===== */
+.cc-card {
+  border-color: var(--accent-border);
+}
+
+.cc-messages {
+  height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 12px;
+  scroll-behavior: smooth;
+}
+
+.cc-msg {
+  margin-bottom: 12px;
+}
+
+.cc-msg-user {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cc-msg-assistant {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.cc-msg-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.cc-msg-user-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+
+.cc-msg-assistant-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-bottom-left-radius: 2px;
+}
+
+.cc-msg-assistant-bubble pre {
+  background: var(--surface-2);
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+
+.cc-msg-assistant-bubble code {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.cc-tools {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.cc-tool-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--surface-3);
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+}
+
+.cc-thinking {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.cc-thinking::after {
+  content: '...';
+  display: inline-block;
+  overflow: hidden;
+  width: 0;
+  vertical-align: bottom;
+  animation: ccDots 1.2s steps(4, end) infinite;
+}
+
+@keyframes ccDots {
+  to { width: 1.2em; }
+}
