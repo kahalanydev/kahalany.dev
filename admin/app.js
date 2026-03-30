@@ -2102,6 +2102,39 @@
           });
         }
 
+        // Build portal context for first message injection
+        function buildPortalContext() {
+          let ctx = `[Portal Context — ${project.name}]\n`;
+          ctx += `Status: ${project.status} | Progress: ${project.progress_percent}%\n`;
+          if (project.org_name) ctx += `Client: ${project.org_name}\n`;
+          ctx += `\nMilestones:\n`;
+          milestones.forEach((m, i) => {
+            const icon = m.status === 'completed' ? '✅' : m.status === 'in_progress' ? '🔄' : '⬚';
+            ctx += `${i + 1}. ${icon} ${m.title} (${m.status})\n`;
+          });
+          // Include open tickets if loaded
+          try {
+            const ticketsEl = $('#ticketsSection');
+            if (ticketsEl) {
+              const rows = ticketsEl.querySelectorAll('tr[data-ticket-href]');
+              if (rows.length > 0) {
+                ctx += `\nOpen Tickets:\n`;
+                rows.forEach(r => {
+                  const cells = r.querySelectorAll('td');
+                  if (cells.length >= 5) {
+                    ctx += `- #${cells[0].textContent} ${cells[1].textContent} (${cells[2].textContent.trim()}, ${cells[3].textContent.trim()}, ${cells[4].textContent.trim()})\n`;
+                  }
+                });
+              }
+            }
+          } catch {}
+          if (plan && plan.content) {
+            ctx += `\nProject Plan:\n${plan.content.substring(0, 2000)}\n`;
+          }
+          ctx += `[End Portal Context]\n\n`;
+          return ctx;
+        }
+
         // Send message
         async function ccSendMessage() {
           const input = $('#ccMsgInput');
@@ -2110,6 +2143,7 @@
           if (!msg || !mappedPath) return;
           input.value = '';
 
+          // Show user message in chat (without context prefix)
           cc.chats[projectId].push({ role: 'user', content: msg });
           cc.saveMessage(projectId, { role: 'user', content: msg, timestamp: Date.now() });
           cc.streaming[projectId] = { text: '', tools: [], active: true };
@@ -2121,7 +2155,12 @@
           if (stopBtn) stopBtn.style.display = '';
 
           try {
-            await cc.send(projectId, msg, mappedPath);
+            // Inject portal context on first message of session
+            let sendMsg = msg;
+            if (cc.chats[projectId].filter(m => m.role === 'user').length === 1) {
+              sendMsg = buildPortalContext() + msg;
+            }
+            await cc.send(projectId, sendMsg, mappedPath);
           } catch (err) {
             cc.streaming[projectId] = { text: '', tools: [], active: false };
             cc.chats[projectId].push({ role: 'assistant', content: `Connection error: ${err.message}`, tools: [] });
