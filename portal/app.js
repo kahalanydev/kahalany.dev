@@ -678,7 +678,7 @@
             <span class="card-title">Plan v${plan.version}</span>
             <span style="font-size:12px;color:var(--text-dim)">Last updated: ${formatDate(plan.updated_at)}</span>
           </div>
-          <div class="plan-content md-rendered" style="line-height:1.6;color:var(--text-secondary)">${renderMarkdown(escapeHtml(plan.content))}</div>
+          <div class="plan-content md-rendered">${renderMarkdown(escapeHtml(plan.content))}</div>
         </div>
 
         ${project_status === 'proposed' ? `

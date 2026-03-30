@@ -608,10 +608,6 @@ table tr:hover td { background: var(--surface-2); }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 24px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
 }
 
 .approve-section {
