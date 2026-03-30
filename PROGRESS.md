@@ -492,6 +492,153 @@ Generates project-specific `CLAUDE.md` with:
 
 ---
 
+## 2026-03-29 — Persistent Volume & Deployment Fix
+
+### Problem
+Every Coolify redeploy wiped the SQLite database because no persistent volume was mounted. Admin password, SMTP config, OAuth settings, all users — lost on every deploy.
+
+### Fix
+- Added Docker volume `kahalany-dev-data` via Coolify's internal PostgreSQL database:
+  ```sql
+  INSERT INTO local_persistent_volumes (name, mount_path, resource_type, resource_id)
+  VALUES ('kahalany-dev-data', '/app/data', 'App\Models\Application', 13)
+  ```
+- Volume mounts at `/app/data` inside the container
+- Verified mount: `/var/lib/docker/volumes/kahalany-dev-data/_data` → `/app/data`
+- Database, uploaded files, and all config now survive redeploys
+
+### Deploy Workflow (established)
+1. Make changes locally
+2. `git add` + `git commit` + `git push origin master`
+3. SSH to server and trigger: `curl -X POST -H 'Authorization: Bearer 9|stagingsetuptoken1773060763' 'http://localhost:8000/api/v1/deploy?uuid=zcco40skss0o8wwocs40k4gs&force=true'`
+4. Container rebuilds from GitHub, volume persists data
+
+### SMTP Configuration
+- Host: `smtp.gmail.com`, Port: `587`
+- Username: `kahalanydev@gmail.com`
+- Password: Google App Password (2FA required, generated at myaccount.google.com → Security → App Passwords)
+- From: `"Kahalany.Dev" <kahalanydev@gmail.com>`
+
+---
+
+## 2026-03-30 — Cross-Org Users, Ticket Notifications, Auto-Deploy, Bug Fixes
+
+### Settings Page Fix
+- GET /api/auth/users now returns ALL users (not just admins) with proper role badges
+- Role badges: admin (blue), staff (purple), client (green)
+- Status: pending (yellow) vs active (green)
+
+### Client User Management
+- Clients page now shows users in a table with Reset PW and Remove buttons
+- Cross-org badge displayed for users from other organizations
+- DELETE endpoint handles both direct org members (deletes user) and cross-org members (removes project_members only)
+
+### Cross-Org User Assignment
+- Adding a user who already belongs to another org now adds them as `project_members` instead of blocking
+- All projects in the target org get the cross-org user added
+- Audit trail via `cross_org_member_added` activity log entry
+- Fixed: `project_members` table missing `id` field on INSERT and `added_by` column migration
+
+### Coolify Auto-Deploy
+- Set `manual_webhook_secret_github` on the Coolify app (source_id was 0, not linked to GitHub App)
+- Created GitHub webhook pointing to Coolify's webhook endpoint
+- Set `fqdn` to `https://kahalany.dev` (was previously None)
+- Production now auto-deploys on push to master
+
+### Project Plans Populated
+- Seeded detailed project plans for PCG and ShipHero AI via POST /api/admin/projects/:id/plan
+- Plans visible in both admin Project Detail and client portal Plan page
+
+### Ticket Notifications
+- **Email**: When a client creates a ticket, all admin/staff users receive a themed email notification via `sendTicketNotification()` in email.js
+- **Webhook**: Configurable webhook URL (Slack, Discord, custom) fires a JSON POST on ticket creation
+- Admin Settings: "Notifications" card with SMTP config + Ticket Webhook URL field
+- Both fire asynchronously after the ticket response (don't block the client)
+
+### SPA Navigation Bug Fix
+- Fixed double-render bug: sidebar click handler was calling `render()` AND setting `window.location.hash` (triggering hashchange → second render)
+- Two async renders raced, destroying event handlers (add user, etc. didn't work without page refresh)
+- Fix: removed explicit `render()` from sidebar click, letting hashchange handle it exclusively
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/routes/auth.js` | All-users listing, webhook config save |
+| `server/routes/admin.js` | Cross-org user assignment, client user delete, reset PW |
+| `server/routes/portal.js` | Ticket notification (email + webhook) after creation |
+| `server/utils/email.js` | Added `sendTicketNotification()`, exported `emailWrapper` |
+| `server/db.js` | `safeAlter` for project_members.added_by column |
+| `admin/app.js` | Settings users card, notifications card, clients table, nav fix |
+
+---
+
+## 2026-03-30 — Claude Code Chat Widget Integration
+
+### Overview
+Embedded a native Claude Code chat interface directly into admin panel project pages. Allows admins to interact with Claude Code AI scoped to each project's local folder, without leaving the admin panel.
+
+### Architecture
+```
+Admin Panel (kahalany.dev)          Claude Code Server (code.kahalany.dev)
+  Browser JS ──────────────────────── Cloudflare Tunnel ──── localhost:3141
+    │                                      │
+    ├─ POST /api/auth/pair (pairing)       ├─ JWT auth (RS256)
+    ├─ POST /api/claude/send (messages)    ├─ Claude CLI process pool
+    ├─ WSS /ws (streaming)                 ├─ WebSocket broadcast
+    └─ GET /api/projects (folder list)     └─ Project folder listing
+```
+
+### Claude Code Client Module (`admin/app.js`)
+- `cc` object: token management, authenticated fetch with auto-refresh, pairing flow, WebSocket connection with auto-reconnect
+- Token refresh with dedup (`_refreshPromise`), proper error propagation on non-2xx responses
+- Methods: `pair()`, `disconnect()`, `send()`, `stop()`, `reset()`, `isRunning()`, `listProjects()`
+- In-memory chat state: `cc.chats[projectId]`, `cc.streaming[projectId]`
+
+### Settings Page — Claude Code Card
+- Server URL input (default: `https://code.kahalany.dev`)
+- 6-digit pairing code input (from Claude Code Desktop startup)
+- Connection status badge (Connected/Not connected)
+- Disconnect button when connected
+
+### Project Detail — Chat Widget (grid-2 right column)
+- Positioned next to Milestones in the primary grid (Project Plan moved below)
+- **Not connected**: Shows "Configure in Settings" link with lightning icon
+- **Connected, no folder mapped**: Fetches project folders from CC server, dropdown to select matching local folder
+- **Connected + mapped**: Full chat interface:
+  - Messages area (scrollable, min 280px) with user bubbles (blue, right) and assistant bubbles (left, markdown-rendered)
+  - Tool use badges showing which tools Claude uses (Read, Edit, Bash, etc.)
+  - Real-time streaming via WebSocket (`claude:stream`, `claude:tool-use`, `claude:done`)
+  - Send on Enter, Stop button during generation, Reset conversation button
+  - Change folder mapping button
+  - "Thinking..." animation with animated dots
+
+### Claude Code Server CORS
+- Added `https://kahalany.dev` to allowed origins in `Claude-Code-Desk-Mobile/claude-code-ui-mobile/server/index.js`
+- Required for cross-origin API calls from admin panel browser to CC server via Cloudflare tunnel
+
+### CSS
+- `.cc-card` with accent border
+- `.cc-messages` scrollable container (dark bg, rounded)
+- `.cc-msg-user-bubble` (blue accent) and `.cc-msg-assistant-bubble` (surface bg with border)
+- `.cc-tool-badge` monospace tool indicators
+- `.cc-thinking::after` animated dots (width-based animation)
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `admin/app.js` | CC client module (~130 lines), Settings card, chat widget in project detail (~150 lines) |
+| `admin/styles.css` | Chat widget styles (~100 lines) |
+| `Claude-Code-Desk-Mobile/.../server/index.js` | CORS origin whitelist |
+
+### Setup Instructions
+1. Restart Claude Code Desktop (picks up CORS change)
+2. Admin → Settings → Claude Code card → enter server URL + pairing code → Connect
+3. Open any project → Claude Code chat appears in grid next to Milestones
+4. Select matching local folder from dropdown
+5. Chat with Claude scoped to that project
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [x] ~~Add more contact methods (phone, WhatsApp, Calendly)~~ — Added WhatsApp + contact form

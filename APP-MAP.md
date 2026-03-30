@@ -201,16 +201,20 @@ Client → Traefik (SSL) → Express (:8080)
 
 ### Settings
 - Change password form
-- Admin user management (list, add, remove)
-- New admin gets random temp password (must change on first login)
+- Users table: all users with role badges (admin/staff/client), status, reset PW, remove
 - SMTP configuration card (host, port, user, pass, from address) with test email button
+- Ticket Webhook URL (Slack, Discord, custom endpoints)
 - Google OAuth configuration (client ID, secret, enable/disable)
+- Dev Keys management (create, revoke HMAC keys for dev API)
+- **Claude Code Integration**: Server URL + pairing code, connection status, disconnect
 
-### Email System
+### Email & Notification System
 - **Nodemailer** with admin-configurable SMTP (settings stored in `config` table)
-- **Welcome emails**: Sent when admin creates new admin/staff/client user — includes credentials + login link
+- **Welcome emails**: Sent when admin creates new admin/staff/client user — includes invite link
 - **Password reset emails**: Sent when admin resets a user's password
 - **Contact notifications**: New contact form submissions emailed to hello@kahalany.dev
+- **Ticket notifications**: Email all admin/staff when a client creates a ticket
+- **Ticket webhook**: Configurable POST webhook (JSON payload) on ticket creation
 - **Graceful fallback**: If SMTP not configured, logs to console instead of failing
 
 ## Client Portal Pages
@@ -255,12 +259,25 @@ Client → Traefik (SSL) → Express (:8080)
 ### Clients Page
 - Organization list with user counts
 - Create organization form
-- Add client users with temporary password generation
+- Add client users with invite link (email sent automatically)
+- Cross-org user assignment: adding a user from another org creates `project_members` entries
+- User table per org with Reset PW and Remove buttons
+- Cross-org badge for users from other organizations
 
 ### Ticket Management
 - Status/priority/assignment controls
 - Comment thread with internal note option (yellow-bordered)
 - Post as public or internal comment
+- Auto-notifications on creation (email + webhook)
+
+### Claude Code Integration (Project Detail)
+- Chat widget in grid-2 right column (next to Milestones) on every project detail page
+- Connects to Claude Code Desktop server (`code.kahalany.dev`) via CORS + JWT auth
+- Pairing flow: 6-digit code from Claude Code Desktop startup
+- Folder mapping: select local project folder from CC server's folder list
+- Real-time streaming: WebSocket connection for `claude:stream`, `claude:tool-use`, `claude:done` events
+- Chat features: markdown rendering, tool use badges, send/stop/reset, in-memory history
+- Architecture: Browser ↔ Cloudflare Tunnel ↔ localhost:3141 (Claude Code server) ↔ Claude CLI
 
 ## Theming
 - **Dark/light mode** across all three frontends (main site, admin, portal)
@@ -271,7 +288,9 @@ Client → Traefik (SSL) → Express (:8080)
 
 ## Deployment
 - **Docker**: `node:20-alpine` runs Express on port 8080
-- **Coolify**: public repo, auto-deploy on push to `master`
+- **Coolify**: public repo, deploy via API (`POST /api/v1/deploy?uuid=zcco40skss0o8wwocs40k4gs&force=true`)
 - **Traefik**: routes `kahalany.dev` → container:8080, auto-SSL
-- **Persistent storage**: `data/` directory must be mounted as a Docker volume in Coolify for DB persistence
+- **Persistent storage**: Docker volume `kahalany-dev-data` mounted at `/app/data` (configured in Coolify DB, survives redeploys)
+- **SMTP**: Gmail via App Password (kahalanydev@gmail.com), configured in admin Settings
 - **First run**: check Coolify deployment logs for the initial admin password
+- **Deploy workflow**: commit + push to GitHub → Coolify auto-deploys via webhook (manual_webhook_secret_github)
