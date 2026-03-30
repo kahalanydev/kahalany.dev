@@ -1543,35 +1543,64 @@
               `).join('')}
           </div>
 
-          <!-- Plan -->
-          <div class="card">
+          <!-- Claude Code (primary position) -->
+          <div class="card cc-card" style="display:flex;flex-direction:column">
             <div class="card-header">
-              <span class="card-title">Project Plan</span>
-              <div style="display:flex;align-items:center;gap:8px">
-                ${plan ? `<span style="font-size:11px;color:var(--text-dim)">v${plan.version}</span>` : ''}
-                ${plan ? `<button class="btn btn-secondary btn-sm" id="planHistoryBtn">History</button>` : ''}
-                <button class="btn btn-secondary btn-sm" id="editPlanBtn">${plan ? 'Edit' : 'Create'} Plan</button>
-              </div>
+              <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                <span style="font-family:var(--mono);font-size:14px;color:var(--accent)">&gt;_</span> Claude Code
+              </span>
+              <div style="display:flex;align-items:center;gap:8px" id="ccHeaderActions"></div>
             </div>
-            <div id="planEditor" style="display:none;margin-bottom:16px">
-              <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px">
-                <button class="btn btn-sm planTabBtn active" data-tab="write" style="font-size:12px">Write</button>
-                <button class="btn btn-sm planTabBtn" data-tab="preview" style="font-size:12px">Preview</button>
-              </div>
-              <div id="planWriteTab">
-                <textarea id="planContent" style="width:100%;min-height:300px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;resize:vertical;line-height:1.6">${plan ? escapeHtml(plan.content) : ''}</textarea>
-              </div>
-              <div id="planPreviewTab" style="display:none;min-height:300px;padding:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px" class="md-rendered"></div>
-              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-                <button class="btn btn-primary btn-sm" id="savePlanBtn">Save Plan</button>
-                ${['planning', 'proposed'].includes(project.status) && plan ? `<button class="btn btn-secondary btn-sm" id="proposePlanBtn" style="background:var(--success);border-color:var(--success);color:#fff">${project.status === 'proposed' ? 'Re-send to Client' : 'Send to Client'}</button>` : ''}
-                <span id="planMsg" style="font-size:12px"></span>
-              </div>
+            <div id="ccWidgetBody" style="flex:1;display:flex;flex-direction:column">
+              ${!cc.isConnected() ? `
+                <div style="text-align:center;padding:32px 16px;color:var(--text-dim);flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                  <div style="font-size:32px;margin-bottom:12px;opacity:0.3">&#9889;</div>
+                  <p style="margin-bottom:12px;font-size:13px">Connect your Claude Code server<br>to use AI on this project.</p>
+                  <a href="#/settings" class="btn btn-secondary btn-sm" style="text-decoration:none">Configure in Settings</a>
+                </div>
+              ` : `
+                <div id="ccChatArea" style="flex:1;display:flex;flex-direction:column">
+                  <div id="ccMessages" class="cc-messages" style="flex:1;min-height:280px"></div>
+                  <div id="ccToolStatus" style="display:none;padding:8px 12px;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border);font-family:var(--mono)"></div>
+                  <div style="display:flex;gap:8px;padding:12px 0 0">
+                    <input type="text" id="ccMsgInput" placeholder="Ask Claude about this project..." style="flex:1;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
+                    <button class="btn btn-primary btn-sm" id="ccSendBtn" style="width:auto;padding:10px 20px">Send</button>
+                    <button class="btn btn-danger btn-sm" id="ccStopBtn" style="width:auto;padding:10px 14px;display:none">Stop</button>
+                  </div>
+                </div>
+              `}
             </div>
-            <div id="planVersionsPanel" style="display:none;margin-bottom:16px"></div>
-            ${plan ? `<div id="planDisplay" class="md-rendered" style="max-height:300px;overflow-y:auto;font-size:13px;line-height:1.6">${renderMarkdown(escapeHtml(plan.content))}</div>` :
-              '<p style="color:var(--text-dim);font-size:13px">No plan created yet.</p>'}
           </div>
+        </div>
+
+        <!-- Plan (below grid) -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Project Plan</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${plan ? `<span style="font-size:11px;color:var(--text-dim)">v${plan.version}</span>` : ''}
+              ${plan ? `<button class="btn btn-secondary btn-sm" id="planHistoryBtn">History</button>` : ''}
+              <button class="btn btn-secondary btn-sm" id="editPlanBtn">${plan ? 'Edit' : 'Create'} Plan</button>
+            </div>
+          </div>
+          <div id="planEditor" style="display:none;margin-bottom:16px">
+            <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px">
+              <button class="btn btn-sm planTabBtn active" data-tab="write" style="font-size:12px">Write</button>
+              <button class="btn btn-sm planTabBtn" data-tab="preview" style="font-size:12px">Preview</button>
+            </div>
+            <div id="planWriteTab">
+              <textarea id="planContent" style="width:100%;min-height:300px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;resize:vertical;line-height:1.6">${plan ? escapeHtml(plan.content) : ''}</textarea>
+            </div>
+            <div id="planPreviewTab" style="display:none;min-height:300px;padding:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;max-height:600px" class="md-rendered"></div>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+              <button class="btn btn-primary btn-sm" id="savePlanBtn">Save Plan</button>
+              ${['planning', 'proposed'].includes(project.status) && plan ? `<button class="btn btn-secondary btn-sm" id="proposePlanBtn" style="background:var(--success);border-color:var(--success);color:#fff">${project.status === 'proposed' ? 'Re-send to Client' : 'Send to Client'}</button>` : ''}
+              <span id="planMsg" style="font-size:12px"></span>
+            </div>
+          </div>
+          <div id="planVersionsPanel" style="display:none;margin-bottom:16px"></div>
+          ${plan ? `<div id="planDisplay" class="md-rendered" style="max-height:300px;overflow-y:auto;font-size:13px;line-height:1.6">${renderMarkdown(escapeHtml(plan.content))}</div>` :
+            '<p style="color:var(--text-dim);font-size:13px">No plan created yet.</p>'}
         </div>
 
         <!-- Members -->
@@ -1621,33 +1650,6 @@
           `}
         </div>
 
-        <!-- Claude Code -->
-        <div class="card cc-card">
-          <div class="card-header">
-            <span class="card-title" style="display:flex;align-items:center;gap:8px">
-              <span style="font-family:var(--mono);font-size:14px;color:var(--accent)">&gt;_</span> Claude Code
-            </span>
-            <div style="display:flex;align-items:center;gap:8px" id="ccHeaderActions"></div>
-          </div>
-          <div id="ccWidgetBody">
-            ${!cc.isConnected() ? `
-              <div style="text-align:center;padding:24px;color:var(--text-dim)">
-                <p style="margin-bottom:12px">Connect your Claude Code server to use AI here.</p>
-                <a href="#/settings" class="btn btn-secondary btn-sm" style="text-decoration:none">Configure in Settings</a>
-              </div>
-            ` : `
-              <div id="ccChatArea">
-                <div id="ccMessages" class="cc-messages"></div>
-                <div id="ccToolStatus" style="display:none;padding:8px 12px;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border);font-family:var(--mono)"></div>
-                <div style="display:flex;gap:8px;padding:12px 0 0">
-                  <input type="text" id="ccMsgInput" placeholder="Ask Claude about this project..." style="flex:1;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
-                  <button class="btn btn-primary btn-sm" id="ccSendBtn" style="width:auto;padding:10px 20px">Send</button>
-                  <button class="btn btn-danger btn-sm" id="ccStopBtn" style="width:auto;padding:10px 14px;display:none">Stop</button>
-                </div>
-              </div>
-            `}
-          </div>
-        </div>
       `;
 
       // Status change handler
