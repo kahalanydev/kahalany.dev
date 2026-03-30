@@ -232,19 +232,17 @@ Client → Traefik (SSL) → Express (:8080)
 - **Hero project cards** with SVG circular progress rings (animated fill)
 - Milestone dot indicators (green = done, gray = pending) and "Up next: [milestone]" preview
 - Countdown to target date or "X days overdue" warning in red
-- Recent activity feed with per-action-type icons
+- **2-column widget grid** below hero cards:
+  - **Left column**: Milestone Spotlight (active/upcoming milestones with status indicators) + Ticket Summary (open/in-progress/closed counts, recent tickets list) + Quick Actions (create ticket per project)
+  - **Right column**: Compact Activity Feed (8 items, collapsed duplicates with multiplier badges)
 
 ### Project View
 - **Phase indicator bar**: 6-step horizontal bar (Planning → Proposed → Approved → In Progress → Review → Completed) with checkmarks for passed phases, glowing blue for current
 - **SVG progress ring** (120px) with 4 stat cards: milestones done, open tickets, days active, days remaining
-- **Visual milestone timeline**: Vertical connected nodes with:
-  - Green circle + checkmark = completed
-  - Pulsing blue circle (CSS animation) = in progress
-  - Hollow gray circle = upcoming
-  - Green connector line up to current milestone, gray after
-  - Title, description, dates, completion notes per node
-- Ticket action buttons (View Tickets / Create Ticket)
-- Recent activity feed with action-type icons
+- **Ticket action buttons** (View Tickets / Create Ticket) in top-right of stats overview card
+- **Side-by-side grid** (1.4fr 1fr):
+  - **Left**: Visual milestone timeline with vertical connected nodes (green checkmark = completed, pulsing blue = in progress, hollow gray = upcoming, green connector line up to current)
+  - **Right**: Compact activity feed with collapsed duplicates
 
 ### Plan View
 - Project plan content display

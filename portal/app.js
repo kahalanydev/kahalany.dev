@@ -378,6 +378,25 @@
     });
   }
 
+  // ===== COLLAPSE DUPLICATE ACTIVITY =====
+  function collapseActivity(items) {
+    const collapsed = [];
+    let prev = null;
+    items.forEach(a => {
+      if (prev && prev.action === a.action && prev.user_name === a.user_name
+          && prev.action.includes('status_changed') === false
+          && Math.abs(new Date(prev.created_at) - new Date(a.created_at)) < 3600000) {
+        // Same action by same person within 1h — skip duplicate
+        if (!prev._count) prev._count = 1;
+        prev._count++;
+      } else {
+        collapsed.push(a);
+        prev = a;
+      }
+    });
+    return collapsed;
+  }
+
   // ===== RENDER: DASHBOARD =====
   async function renderDashboard() {
     state.projectId = null;
@@ -385,13 +404,16 @@
 
     try {
       const res = await api('/portal/dashboard');
-      const { projects, recentActivity } = res.data;
+      const { projects, recentActivity, activeMilestones, recentTickets, ticketStats } = res.data;
 
       const activeCount = projects.filter(p => ['in_progress','review'].includes(p.status)).length;
       const pendingCount = projects.filter(p => p.status === 'proposed').length;
       const summaryParts = [];
       if (activeCount) summaryParts.push(`${activeCount} project${activeCount > 1 ? 's' : ''} active`);
       if (pendingCount) summaryParts.push(`${pendingCount} awaiting your approval`);
+
+      const collapsedActivity = collapseActivity(recentActivity);
+      const totalTickets = (ticketStats.open || 0) + (ticketStats.in_progress || 0) + (ticketStats.closed || 0);
 
       $('#mainContent').innerHTML = `
         <div class="page-header">
@@ -429,22 +451,89 @@
               </div>
             </div>
           </div>
-        `).join('')}</div>`}
+        `).join('')}</div>
 
-        ${recentActivity.length > 0 ? `
-          <div class="card" style="margin-top:24px">
-            <div class="card-header"><span class="card-title">Recent Activity</span></div>
-            <ul class="activity-list">
-              ${recentActivity.slice(0, 10).map(a => `
-                <li class="activity-item">
-                  <div class="activity-icon">${activityIcon(a.action)}</div>
-                  <div class="activity-text">${activityText(a)}</div>
-                  <div class="activity-time">${timeAgo(a.created_at)}</div>
-                </li>
+        <!-- Dashboard Widgets Grid -->
+        <div class="dashboard-widgets">
+          <!-- Left Column: Milestone Spotlight + Ticket Summary -->
+          <div class="dashboard-widgets-left">
+            ${activeMilestones.length > 0 ? `
+              <div class="card widget-card">
+                <div class="card-header"><span class="card-title">Milestone Spotlight</span></div>
+                <div class="milestone-spotlight-list">
+                  ${activeMilestones.map(m => `
+                    <div class="spotlight-item">
+                      <div class="spotlight-indicator ${m.status}"></div>
+                      <div class="spotlight-info">
+                        <div class="spotlight-title">${escapeHtml(m.title)}</div>
+                        <div class="spotlight-meta">
+                          <span class="spotlight-project">${escapeHtml(m.project_name)}</span>
+                          ${m.target_date ? `<span class="spotlight-date">Target: ${formatDate(m.target_date)}</span>` : ''}
+                        </div>
+                      </div>
+                      ${statusBadge(m.status)}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <div class="card widget-card">
+              <div class="card-header"><span class="card-title">Tickets</span></div>
+              <div class="ticket-stats-row">
+                <div class="ticket-stat">
+                  <span class="ticket-stat-num accent">${ticketStats.open || 0}</span>
+                  <span class="ticket-stat-label">Open</span>
+                </div>
+                <div class="ticket-stat">
+                  <span class="ticket-stat-num warning">${ticketStats.in_progress || 0}</span>
+                  <span class="ticket-stat-label">In Progress</span>
+                </div>
+                <div class="ticket-stat">
+                  <span class="ticket-stat-num success">${ticketStats.closed || 0}</span>
+                  <span class="ticket-stat-label">Closed</span>
+                </div>
+              </div>
+              ${recentTickets.length > 0 ? `
+                <div class="recent-tickets-list">
+                  ${recentTickets.map(t => `
+                    <a class="recent-ticket-item" href="#/project/${t.project_id}/tickets/${t.id}">
+                      <span class="recent-ticket-num">#${t.ticket_number}</span>
+                      <span class="recent-ticket-title">${escapeHtml(t.title)}</span>
+                      ${statusBadge(t.status)}
+                    </a>
+                  `).join('')}
+                </div>
+              ` : `<p style="color:var(--text-dim);font-size:13px;margin-top:8px">No tickets yet</p>`}
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+              ${projects.map(p => `
+                <a href="#/project/${p.id}/tickets/new" class="quick-action-btn">+ Ticket for ${escapeHtml(p.name)}</a>
               `).join('')}
-            </ul>
+            </div>
           </div>
-        ` : ''}
+
+          <!-- Right Column: Compact Activity Feed -->
+          <div class="dashboard-widgets-right">
+            <div class="card widget-card">
+              <div class="card-header"><span class="card-title">Recent Activity</span></div>
+              ${collapsedActivity.length > 0 ? `
+                <ul class="activity-list compact">
+                  ${collapsedActivity.slice(0, 8).map(a => `
+                    <li class="activity-item">
+                      <div class="activity-icon">${activityIcon(a.action)}</div>
+                      <div class="activity-text">${activityText(a)}${a._count > 1 ? ` <span class="activity-count">&times;${a._count}</span>` : ''}</div>
+                      <div class="activity-time">${timeAgo(a.created_at)}</div>
+                    </li>
+                  `).join('')}
+                </ul>
+              ` : `<p style="color:var(--text-dim);font-size:13px">No activity yet</p>`}
+            </div>
+          </div>
+        </div>
+        `}
       `;
 
       $$('.hero-card').forEach(card => card.addEventListener('click', () => {
@@ -467,6 +556,8 @@
       const showPlanApproval = project.status === 'proposed';
       const msDone = milestones.filter(m => m.status === 'completed').length;
 
+      const collapsedProjectActivity = collapseActivity(recentActivity);
+
       $('#mainContent').innerHTML = `
         <div class="page-header">
           <h1>${escapeHtml(project.name)}</h1>
@@ -483,7 +574,7 @@
           </div>
         ` : ''}
 
-        <!-- Progress + Stats -->
+        <!-- Progress + Stats + Ticket Buttons -->
         <div class="project-overview-card">
           <div class="project-overview-ring">
             ${progressRing(project.progress_percent, 120, 9)}
@@ -506,56 +597,61 @@
               <div class="stat-label">${project.days_remaining !== null && project.days_remaining < 0 ? 'Days Overdue' : 'Days Left'}</div>
             </div>
           </div>
-        </div>
-
-        <!-- Visual Milestone Timeline -->
-        <div class="card">
-          <div class="card-header"><span class="card-title">Milestones</span></div>
-          ${milestones.length === 0 ? '<p style="color:var(--text-dim);font-size:14px">No milestones defined yet.</p>' : `
-            <div class="timeline">
-              ${milestones.map((m, i) => `
-                <div class="timeline-item">
-                  <div class="timeline-track">
-                    <div class="timeline-node ${m.status}">
-                      ${m.status === 'completed' ? '&#10003;' : m.status === 'in_progress' ? '' : ''}
-                    </div>
-                    ${i < milestones.length - 1 ? `<div class="timeline-connector ${m.status === 'completed' ? 'done' : ''}"></div>` : ''}
-                  </div>
-                  <div class="timeline-content">
-                    <div class="timeline-title">${escapeHtml(m.title)}</div>
-                    ${m.description ? `<div class="timeline-desc">${escapeHtml(m.description)}</div>` : ''}
-                    <div class="timeline-meta">
-                      ${statusBadge(m.status)}
-                      ${m.target_date ? ` <span class="timeline-date">Target: ${formatDate(m.target_date)}</span>` : ''}
-                      ${m.completed_date ? ` <span class="timeline-date">Completed: ${formatDate(m.completed_date)}</span>` : ''}
-                    </div>
-                    ${m.completion_notes ? `<div class="timeline-notes">${escapeHtml(m.completion_notes)}</div>` : ''}
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          `}
-        </div>
-
-        <div style="display:flex;gap:12px;margin-bottom:24px">
-          <a href="#/project/${projectId}/tickets" class="btn btn-secondary" style="flex:1;text-align:center">View Tickets</a>
-          <a href="#/project/${projectId}/tickets/new" class="btn btn-primary" style="flex:1;width:auto">Create Ticket</a>
-        </div>
-
-        ${recentActivity.length > 0 ? `
-          <div class="card">
-            <div class="card-header"><span class="card-title">Recent Activity</span></div>
-            <ul class="activity-list">
-              ${recentActivity.map(a => `
-                <li class="activity-item">
-                  <div class="activity-icon">${activityIcon(a.action)}</div>
-                  <div class="activity-text">${activityText(a)}</div>
-                  <div class="activity-time">${timeAgo(a.created_at)}</div>
-                </li>
-              `).join('')}
-            </ul>
+          <div class="project-overview-actions">
+            <a href="#/project/${projectId}/tickets" class="btn btn-secondary btn-sm">View Tickets</a>
+            <a href="#/project/${projectId}/tickets/new" class="btn btn-primary btn-sm">Create Ticket</a>
           </div>
-        ` : ''}
+        </div>
+
+        <!-- Milestones + Activity Side-by-Side -->
+        <div class="project-content-grid">
+          <div class="project-content-main">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Milestones</span></div>
+              ${milestones.length === 0 ? '<p style="color:var(--text-dim);font-size:14px">No milestones defined yet.</p>' : `
+                <div class="timeline">
+                  ${milestones.map((m, i) => `
+                    <div class="timeline-item">
+                      <div class="timeline-track">
+                        <div class="timeline-node ${m.status}">
+                          ${m.status === 'completed' ? '&#10003;' : m.status === 'in_progress' ? '' : ''}
+                        </div>
+                        ${i < milestones.length - 1 ? `<div class="timeline-connector ${m.status === 'completed' ? 'done' : ''}"></div>` : ''}
+                      </div>
+                      <div class="timeline-content">
+                        <div class="timeline-title">${escapeHtml(m.title)}</div>
+                        ${m.description ? `<div class="timeline-desc">${escapeHtml(m.description)}</div>` : ''}
+                        <div class="timeline-meta">
+                          ${statusBadge(m.status)}
+                          ${m.target_date ? ` <span class="timeline-date">Target: ${formatDate(m.target_date)}</span>` : ''}
+                          ${m.completed_date ? ` <span class="timeline-date">Completed: ${formatDate(m.completed_date)}</span>` : ''}
+                        </div>
+                        ${m.completion_notes ? `<div class="timeline-notes">${escapeHtml(m.completion_notes)}</div>` : ''}
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              `}
+            </div>
+          </div>
+
+          <div class="project-content-side">
+            ${collapsedProjectActivity.length > 0 ? `
+              <div class="card widget-card">
+                <div class="card-header"><span class="card-title">Recent Activity</span></div>
+                <ul class="activity-list compact">
+                  ${collapsedProjectActivity.slice(0, 8).map(a => `
+                    <li class="activity-item">
+                      <div class="activity-icon">${activityIcon(a.action)}</div>
+                      <div class="activity-text">${activityText(a)}${a._count > 1 ? ` <span class="activity-count">&times;${a._count}</span>` : ''}</div>
+                      <div class="activity-time">${timeAgo(a.created_at)}</div>
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        </div>
       `;
     } catch (err) {
       $('#mainContent').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;

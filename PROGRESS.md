@@ -751,6 +751,47 @@ Claude Code resolves a ticket →
 
 ---
 
+## 2026-03-30 — Portal Dashboard & Project View Redesign
+
+### Dashboard Redesign
+Replaced the full-width activity feed with a 2-column widget layout below the hero project cards.
+
+- **Left column**: Milestone Spotlight (active/upcoming milestones across all projects with status indicators) + Ticket Summary (open/in-progress/closed counts, recent tickets list with links) + Quick Actions (create ticket shortcuts per project)
+- **Right column**: Compact Activity Feed (8 items max, collapsed duplicate entries)
+- **Activity collapsing**: Sequential identical actions by the same user within 1 hour are collapsed with a multiplier badge (e.g. "code pushed x3")
+
+### Project View Redesign
+- **Ticket buttons** moved from standalone row to top-right of the progress/stats overview card
+- **Milestones + Activity** now sit side-by-side in a `1.4fr 1fr` grid instead of each taking a full row
+- Activity feed uses compact styling with collapsed duplicates
+
+### Dashboard API Enrichment
+- `GET /api/portal/dashboard` now returns `activeMilestones` (current/upcoming per project), `recentTickets` (top 5 across all projects), and `ticketStats` (open/in_progress/closed counts)
+
+### Mobile Responsive
+- Both dashboard widgets grid and project content grid collapse to single column at 768px
+- Ticket buttons in overview card switch to horizontal row on mobile
+
+### CSS Added
+- `.dashboard-widgets` — 2-column grid container
+- `.milestone-spotlight-list`, `.spotlight-item` — milestone spotlight cards with status indicators
+- `.ticket-stats-row`, `.ticket-stat` — ticket count summary with color-coded numbers
+- `.recent-tickets-list`, `.recent-ticket-item` — clickable ticket links
+- `.quick-actions`, `.quick-action-btn` — per-project ticket creation shortcuts
+- `.activity-list.compact` — smaller activity items for side panels
+- `.activity-count` — collapsed duplicate multiplier badge
+- `.project-content-grid` — milestones + activity side-by-side
+- `.project-overview-actions` — ticket buttons in stats card
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/routes/portal.js` | Dashboard API enriched with milestones, tickets, stats |
+| `portal/app.js` | Dashboard 2-col layout, project view grid, activity collapsing |
+| `portal/styles.css` | All new widget/grid styles + mobile breakpoints |
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [x] ~~Add more contact methods (phone, WhatsApp, Calendly)~~ — Added WhatsApp + contact form

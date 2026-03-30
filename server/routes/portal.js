@@ -37,8 +37,11 @@ router.get('/dashboard', (req, res) => {
   `).all(userId, orgId || null, orgId || null);
 
   // Enrich each project with milestone summary
+  let activeMilestones = [];
+  let allRecentTickets = [];
+
   projects.forEach(p => {
-    const ms = db.prepare('SELECT id, title, status, target_date FROM milestones WHERE project_id = ? ORDER BY sort_order').all(p.id);
+    const ms = db.prepare('SELECT id, title, status, target_date, completed_date, project_id FROM milestones WHERE project_id = ? ORDER BY sort_order').all(p.id);
     p.milestones_total = ms.length;
     p.milestones_done = ms.filter(m => m.status === 'completed').length;
     const next = ms.find(m => m.status === 'in_progress') || ms.find(m => m.status === 'upcoming');
@@ -50,10 +53,41 @@ router.get('/dashboard', (req, res) => {
     } else {
       p.days_remaining = null;
     }
+
+    // Collect active/upcoming milestones for spotlight widget
+    const current = ms.find(m => m.status === 'in_progress');
+    if (current) activeMilestones.push({ ...current, project_name: p.name });
+    else {
+      const upcoming = ms.find(m => m.status === 'upcoming');
+      if (upcoming) activeMilestones.push({ ...upcoming, project_name: p.name });
+    }
+
+    // Collect recent tickets for summary widget
+    const tickets = db.prepare(`
+      SELECT id, ticket_number, title, status, priority, type, created_at, project_id
+      FROM tickets WHERE project_id = ? ORDER BY created_at DESC LIMIT 5
+    `).all(p.id);
+    tickets.forEach(t => { t.project_name = p.name; });
+    allRecentTickets.push(...tickets);
   });
 
-  // Activity for all visible projects
+  // Sort tickets by date, keep top 5
+  allRecentTickets.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  allRecentTickets = allRecentTickets.slice(0, 5);
+
+  // Ticket stats across all projects
   const projectIds = projects.map(p => p.id);
+  let ticketStats = { open: 0, in_progress: 0, closed: 0 };
+  if (projectIds.length > 0) {
+    const rows = db.prepare(`
+      SELECT status, COUNT(*) as c FROM tickets
+      WHERE project_id IN (${projectIds.map(() => '?').join(',')})
+      GROUP BY status
+    `).all(...projectIds);
+    rows.forEach(r => { ticketStats[r.status] = r.c; });
+  }
+
+  // Activity for all visible projects
   const recentActivity = projectIds.length > 0
     ? db.prepare(`
         SELECT a.*, u.name as user_name
@@ -65,7 +99,7 @@ router.get('/dashboard', (req, res) => {
       `).all(...projectIds)
     : [];
 
-  res.json({ success: true, data: { projects, recentActivity } });
+  res.json({ success: true, data: { projects, recentActivity, activeMilestones, recentTickets: allRecentTickets, ticketStats } });
 });
 
 // ===== PROJECT VIEW =====

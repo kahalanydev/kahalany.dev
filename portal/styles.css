@@ -684,10 +684,14 @@ table tr:hover td { background: var(--surface-2); }
   .hero-cards-grid { grid-template-columns: 1fr; }
   .project-overview-card { flex-direction: column; text-align: center; gap: 16px; }
   .project-overview-stats { justify-content: center; }
+  .project-overview-actions { flex-direction: row; width: 100%; }
+  .project-overview-actions .btn { flex: 1; }
   .phase-bar { gap: 0; }
   .phase-label { font-size: 9px; }
   .phase-dot { width: 24px; height: 24px; font-size: 10px; }
   .phase-line { min-width: 10px; margin-top: 11px; }
+  .dashboard-widgets { grid-template-columns: 1fr; }
+  .project-content-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
@@ -695,6 +699,155 @@ table tr:hover td { background: var(--surface-2); }
   .ticket-meta { flex-direction: column; gap: 4px; }
   .stat-item { min-width: 60px; }
   .stat-value { font-size: 18px; }
+}
+
+/* ===== DASHBOARD WIDGETS GRID ===== */
+.dashboard-widgets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+.dashboard-widgets-left,
+.dashboard-widgets-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.widget-card { margin-bottom: 0; }
+
+/* Milestone Spotlight */
+.milestone-spotlight-list { display: flex; flex-direction: column; gap: 12px; }
+.spotlight-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--surface-3);
+}
+.spotlight-indicator {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--surface-3); flex-shrink: 0;
+}
+.spotlight-indicator.in_progress { background: var(--accent); box-shadow: 0 0 6px rgba(59,130,246,0.4); }
+.spotlight-indicator.upcoming { background: var(--text-dim); }
+.spotlight-indicator.completed { background: var(--success); }
+.spotlight-info { flex: 1; min-width: 0; }
+.spotlight-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.spotlight-meta { font-size: 12px; color: var(--text-dim); display: flex; gap: 12px; flex-wrap: wrap; }
+.spotlight-project { color: var(--text-secondary); }
+.spotlight-date { color: var(--text-dim); }
+
+/* Ticket Stats Row */
+.ticket-stats-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.ticket-stat {
+  flex: 1;
+  text-align: center;
+  padding: 10px 6px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--surface-3);
+}
+.ticket-stat-num {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text);
+}
+.ticket-stat-num.accent { color: var(--accent); }
+.ticket-stat-num.warning { color: var(--warning); }
+.ticket-stat-num.success { color: var(--success); }
+.ticket-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Recent Tickets List */
+.recent-tickets-list { display: flex; flex-direction: column; gap: 6px; }
+.recent-ticket-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+.recent-ticket-item:hover { background: var(--surface-3); border-color: var(--border); }
+.recent-ticket-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.recent-ticket-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Quick Actions */
+.quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-action-btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.quick-action-btn:hover { background: rgba(59, 130, 246, 0.15); }
+
+/* Compact Activity List */
+.activity-list.compact .activity-item { padding: 8px 0; }
+.activity-list.compact .activity-text { font-size: 12px; }
+.activity-list.compact .activity-time { font-size: 11px; }
+.activity-list.compact .activity-icon { width: 22px; height: 22px; font-size: 10px; }
+.activity-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+/* ===== PROJECT CONTENT GRID (Milestones + Activity side-by-side) ===== */
+.project-content-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.project-content-main { min-width: 0; }
+.project-content-main .card { margin-bottom: 0; }
+.project-content-side { min-width: 0; }
+.project-content-side .card { margin-bottom: 0; }
+
+/* Project Overview Actions (ticket buttons in stats bar) */
+.project-overview-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* ===== MARKDOWN RENDERED ===== */
