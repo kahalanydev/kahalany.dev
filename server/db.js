@@ -394,7 +394,6 @@ function initSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);');
 
   // Extend users table for portal (safe: no-op if columns already exist)
-  const safeAlter = (sql) => { try { db.run(sql); } catch(e) {} };
   safeAlter('ALTER TABLE users ADD COLUMN org_id TEXT');
   safeAlter('ALTER TABLE users ADD COLUMN login_attempts INTEGER DEFAULT 0');
   safeAlter('ALTER TABLE users ADD COLUMN locked_until TEXT');
