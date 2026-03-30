@@ -10,7 +10,8 @@ router.use(requireAuth);
 router.use(requireRole('admin', 'staff'));
 
 // GET /api/admin/dashboard
-router.get('/dashboard', (req, res) => {
+router.get('/dashboard', (req, res, next) => {
+  try {
   const db = getDb();
 
   // --- Site traffic (compact) ---
@@ -100,6 +101,7 @@ router.get('/dashboard', (req, res) => {
       projects, recentActivity, recentVisitors
     }
   });
+  } catch (err) { next(err); }
 });
 
 // POST /api/admin/contacts/:id/dismiss

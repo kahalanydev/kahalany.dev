@@ -140,6 +140,12 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+// Global error handler — return JSON for API routes instead of Express default HTML
+app.use((err, req, res, _next) => {
+  console.error(`[${req.method} ${req.path}]`, err.message || err);
+  res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+});
+
 // Initialize database and start server
 async function start() {
   await initDb();
