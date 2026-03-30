@@ -588,11 +588,12 @@ table td .mono {
   border-radius: var(--radius);
   background: var(--bg);
   padding: 12px;
-  scroll-behavior: smooth;
+  /* No scroll-behavior: smooth — causes jitter during rapid streaming */
 }
 
 .cc-msg {
   margin-bottom: 12px;
+  animation: ccFadeIn 0.15s ease-out;
 }
 
 .cc-msg-user {
@@ -658,19 +659,89 @@ table td .mono {
   font-size: 10px;
   font-family: var(--mono);
   color: var(--text-dim);
+  animation: ccBadgeIn 0.2s ease-out;
 }
 
+/* Activity status bar — always visible during streaming */
+.cc-activity-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  background: var(--surface);
+  min-height: 36px;
+}
+
+.cc-activity-bar.cc-activity-hidden {
+  display: none;
+}
+
+.cc-activity-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: ccActivityPulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.cc-activity-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Thinking state inside bubble */
 .cc-thinking {
   color: var(--text-dim);
   font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.cc-thinking::after {
-  content: '...';
-  animation: ccPulse 1.4s ease-in-out infinite;
+.cc-thinking-dots {
+  display: inline-flex;
+  gap: 3px;
 }
 
-@keyframes ccPulse {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 1; }
+.cc-thinking-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: ccDotBounce 1.4s ease-in-out infinite;
+}
+
+.cc-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.cc-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* Streaming bubble content fade-in */
+.cc-stream-content {
+  animation: ccFadeIn 0.15s ease-out;
+}
+
+@keyframes ccFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ccBadgeIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ccActivityPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes ccDotBounce {
+  0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
 }

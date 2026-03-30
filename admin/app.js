@@ -236,6 +236,7 @@
     ws: null,
     _wsListeners: new Map(),
     _wsReconnect: null,
+    _wsHasConnected: false,
 
     connectWs() {
       if (this.ws && this.ws.readyState <= 1) return;
@@ -250,6 +251,12 @@
           if (test.status === 401) token = await this.refreshToken();
         } catch {}
         this.ws.send(JSON.stringify({ type: 'auth', token }));
+        // Emit reconnect event so listeners can reload state
+        if (this._wsHasConnected) {
+          const cbs = this._wsListeners.get('__ws_reconnected');
+          if (cbs) cbs.forEach(cb => cb({}));
+        }
+        this._wsHasConnected = true;
       };
       this.ws.onmessage = (e) => {
         try {
@@ -1734,7 +1741,10 @@
               ` : `
                 <div id="ccChatArea" style="flex:1;display:flex;flex-direction:column">
                   <div id="ccMessages" class="cc-messages"></div>
-                  <div id="ccToolStatus" style="display:none;padding:8px 12px;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border);font-family:var(--mono)"></div>
+                  <div id="ccActivityBar" class="cc-activity-bar cc-activity-hidden">
+                    <div class="cc-activity-pulse"></div>
+                    <span class="cc-activity-text" id="ccActivityText">Thinking...</span>
+                  </div>
                   <div style="display:flex;gap:8px;padding:12px 0 0">
                     <input type="text" id="ccMsgInput" placeholder="Ask Claude about this project..." style="flex:1;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px">
                     <button class="btn btn-primary btn-sm" id="ccSendBtn" style="width:auto;padding:10px 20px">Send</button>
@@ -2075,15 +2085,19 @@
           }
         }
 
-        // Render messages
-        function renderCcChat() {
+        // --- Incremental chat renderer (avoids full innerHTML rebuild during streaming) ---
+        let _ccRenderedCount = 0; // tracks how many committed messages are in the DOM
+        let _ccStreamEl = null;   // reference to the live streaming bubble wrapper
+
+        // Full rebuild — used for initial render, history load, and done events
+        function renderCcChatFull() {
           const el = $('#ccMessages');
           if (!el) return;
           const messages = cc.chats[projectId] || [];
           const streaming = cc.streaming[projectId];
           let html = '';
           if (messages.length === 0 && !streaming.active) {
-            html = `<div style="text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px">
+            html = `<div class="cc-empty-state" style="text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px">
               ${mappedPath ? 'Ask Claude anything about this project.' : 'Select a project folder above to get started.'}
             </div>`;
           }
@@ -2098,18 +2112,133 @@
               html += `</div>`;
             }
           });
-          // Streaming message
-          if (streaming.active || streaming.text) {
-            html += `<div class="cc-msg cc-msg-assistant"><div class="cc-msg-bubble cc-msg-assistant-bubble">${
-              streaming.text ? renderMarkdown(escapeHtml(streaming.text)) : '<span class="cc-thinking">Thinking</span>'
-            }</div>`;
-            if (streaming.tools.length) {
-              html += `<div class="cc-tools">${streaming.tools.map(t => `<span class="cc-tool-badge">${escapeHtml(t)}</span>`).join('')}</div>`;
-            }
-            html += `</div>`;
-          }
           el.innerHTML = html;
-          requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+          _ccRenderedCount = messages.length;
+          _ccStreamEl = null;
+          // Append streaming bubble if active
+          if (streaming.active || streaming.text) {
+            _ccEnsureStreamBubble(el, streaming);
+          }
+          el.scrollTop = el.scrollHeight;
+        }
+
+        // Ensure the streaming bubble exists, create if missing
+        function _ccEnsureStreamBubble(container, streaming) {
+          if (!_ccStreamEl) {
+            // Remove empty state if present
+            const empty = container.querySelector('.cc-empty-state');
+            if (empty) empty.remove();
+            _ccStreamEl = document.createElement('div');
+            _ccStreamEl.className = 'cc-msg cc-msg-assistant';
+            _ccStreamEl.innerHTML = `<div class="cc-msg-bubble cc-msg-assistant-bubble cc-stream-bubble"></div><div class="cc-tools cc-stream-tools"></div>`;
+            container.appendChild(_ccStreamEl);
+          }
+          _ccUpdateStreamContent(streaming);
+        }
+
+        // Update just the streaming bubble content (no DOM rebuild)
+        function _ccUpdateStreamContent(streaming) {
+          if (!_ccStreamEl) return;
+          const bubble = _ccStreamEl.querySelector('.cc-stream-bubble');
+          if (!bubble) return;
+          if (streaming.text) {
+            const rendered = renderMarkdown(escapeHtml(streaming.text));
+            if (bubble.innerHTML !== rendered) {
+              bubble.innerHTML = `<div class="cc-stream-content">${rendered}</div>`;
+            }
+          } else {
+            bubble.innerHTML = '<span class="cc-thinking">Thinking<span class="cc-thinking-dots"><span></span><span></span><span></span></span></span>';
+          }
+          // Update tool badges incrementally
+          const toolsEl = _ccStreamEl.querySelector('.cc-stream-tools');
+          if (toolsEl && streaming.tools.length) {
+            const existing = toolsEl.querySelectorAll('.cc-tool-badge').length;
+            if (existing < streaming.tools.length) {
+              // Only append new badges
+              for (let i = existing; i < streaming.tools.length; i++) {
+                const badge = document.createElement('span');
+                badge.className = 'cc-tool-badge';
+                badge.textContent = streaming.tools[i];
+                toolsEl.appendChild(badge);
+              }
+            }
+          }
+        }
+
+        // Incremental update — only touches the streaming bubble
+        function renderCcChatStream() {
+          const el = $('#ccMessages');
+          if (!el) return;
+          const streaming = cc.streaming[projectId];
+          // Check if committed messages changed (shouldn't during streaming, but safety)
+          const messages = cc.chats[projectId] || [];
+          if (messages.length !== _ccRenderedCount) {
+            return renderCcChatFull(); // fallback to full rebuild
+          }
+          if (streaming.active || streaming.text) {
+            _ccEnsureStreamBubble(el, streaming);
+          }
+          el.scrollTop = el.scrollHeight;
+        }
+
+        // Commit streaming bubble to final message (no full rebuild needed)
+        function renderCcChatDone() {
+          const el = $('#ccMessages');
+          if (!el) return;
+          // Remove the streaming bubble
+          if (_ccStreamEl) {
+            _ccStreamEl.remove();
+            _ccStreamEl = null;
+          }
+          // Append the newly committed message(s)
+          const messages = cc.chats[projectId] || [];
+          for (let i = _ccRenderedCount; i < messages.length; i++) {
+            const m = messages[i];
+            const div = document.createElement('div');
+            if (m.role === 'user') {
+              div.className = 'cc-msg cc-msg-user';
+              div.innerHTML = `<div class="cc-msg-bubble cc-msg-user-bubble">${escapeHtml(m.content)}</div>`;
+            } else {
+              div.className = 'cc-msg cc-msg-assistant';
+              div.innerHTML = `<div class="cc-msg-bubble cc-msg-assistant-bubble">${renderMarkdown(escapeHtml(m.content))}</div>`;
+              if (m.tools && m.tools.length) {
+                const toolsDiv = document.createElement('div');
+                toolsDiv.className = 'cc-tools';
+                toolsDiv.innerHTML = m.tools.map(t => `<span class="cc-tool-badge">${escapeHtml(t)}</span>`).join('');
+                div.appendChild(toolsDiv);
+              }
+            }
+            el.appendChild(div);
+          }
+          _ccRenderedCount = messages.length;
+          el.scrollTop = el.scrollHeight;
+        }
+
+        // Alias for backward compat (used by history:updated, reset, etc.)
+        function renderCcChat() { renderCcChatFull(); }
+
+        // --- Activity bar helpers ---
+        function ccShowActivity(text) {
+          const bar = $('#ccActivityBar');
+          const txt = $('#ccActivityText');
+          if (bar) bar.classList.remove('cc-activity-hidden');
+          if (txt) txt.textContent = text || 'Thinking...';
+        }
+        function ccHideActivity() {
+          const bar = $('#ccActivityBar');
+          if (bar) bar.classList.add('cc-activity-hidden');
+        }
+        function ccShowStop() {
+          const sendBtn = $('#ccSendBtn');
+          const stopBtn = $('#ccStopBtn');
+          if (sendBtn) sendBtn.style.display = 'none';
+          if (stopBtn) stopBtn.style.display = '';
+        }
+        function ccShowSend() {
+          const sendBtn = $('#ccSendBtn');
+          const stopBtn = $('#ccStopBtn');
+          if (sendBtn) sendBtn.style.display = '';
+          if (stopBtn) stopBtn.style.display = 'none';
         }
 
         // Folder picker
@@ -2168,14 +2297,11 @@
         // WS event handlers — shared with Desktop/PWA (same key)
         cc.on('claude:process-started', (msg) => {
           if (msg.key !== ccKey) return;
-          // Desktop started a Claude process — show thinking state
           if (!cc.streaming[projectId].active) {
             cc.streaming[projectId] = { text: '', tools: [], active: true };
-            renderCcChat();
-            const sendBtn = $('#ccSendBtn');
-            const stopBtn = $('#ccStopBtn');
-            if (sendBtn) sendBtn.style.display = 'none';
-            if (stopBtn) stopBtn.style.display = '';
+            renderCcChatStream();
+            ccShowActivity('Thinking...');
+            ccShowStop();
           }
         });
 
@@ -2183,11 +2309,9 @@
           if (msg.key !== ccKey) return;
           cc.streaming[projectId].text = msg.text || '';
           cc.streaming[projectId].active = true;
-          renderCcChat();
-          const sendBtn = $('#ccSendBtn');
-          const stopBtn = $('#ccStopBtn');
-          if (sendBtn) sendBtn.style.display = 'none';
-          if (stopBtn) stopBtn.style.display = '';
+          renderCcChatStream();
+          ccShowActivity('Generating response...');
+          ccShowStop();
         });
 
         cc.on('claude:tool-use', (msg) => {
@@ -2196,24 +2320,20 @@
           if (!cc.streaming[projectId].tools.includes(toolName)) {
             cc.streaming[projectId].tools.push(toolName);
           }
-          const toolEl = $('#ccToolStatus');
-          if (toolEl) {
-            toolEl.style.display = '';
-            toolEl.textContent = `Using ${toolName}...`;
-          }
-          renderCcChat();
+          renderCcChatStream();
+          ccShowActivity(`Using ${toolName}...`);
+          ccShowStop();
         });
 
         cc.on('claude:tool-result', (msg) => {
           if (msg.key !== ccKey) return;
-          const toolEl = $('#ccToolStatus');
-          if (toolEl) toolEl.style.display = 'none';
+          ccShowActivity('Processing...');
         });
 
         cc.on('claude:done', (msg) => {
           if (msg.key !== ccKey) return;
           const streaming = cc.streaming[projectId];
-          if (!streaming.active && !streaming.text) return; // Already processed
+          if (!streaming.active && !streaming.text) return;
           const content = streaming.text || msg.output || '';
           const tools = [...streaming.tools];
           cc.streaming[projectId] = { text: '', tools: [], active: false };
@@ -2223,24 +2343,26 @@
           } else if (msg.error) {
             cc.chats[projectId].push({ role: 'assistant', content: `Error: ${msg.error}`, tools: [] });
           }
-          const sendBtn = $('#ccSendBtn');
-          const stopBtn = $('#ccStopBtn');
-          if (sendBtn) sendBtn.style.display = '';
-          if (stopBtn) stopBtn.style.display = 'none';
-          const toolEl = $('#ccToolStatus');
-          if (toolEl) toolEl.style.display = 'none';
-          renderCcChat();
+          renderCcChatDone();
+          ccHideActivity();
+          ccShowSend();
         });
 
         // Sync: reload history when Desktop/PWA saves a message
         if (ccKey) {
           cc.on('history:updated', async (msg) => {
             if (msg.key !== ccKey) return;
-            if (Date.now() - cc._lastHistorySave < 2000) return; // Skip self-triggered
+            if (Date.now() - cc._lastHistorySave < 2000) return;
             await cc.loadHistory(projectId);
-            renderCcChat();
+            renderCcChatFull();
           });
         }
+
+        // Reconnect resilience: reload history when WS reconnects
+        cc.on('__ws_reconnected', async () => {
+          await cc.loadHistory(projectId);
+          renderCcChatFull();
+        });
 
         // Build portal context for first message injection
         function buildPortalContext() {
@@ -2280,19 +2402,15 @@
           if (!msg || !mappedPath) return;
           input.value = '';
 
-          // Show user message in chat (without context prefix)
+          // Show user message in chat
           cc.chats[projectId].push({ role: 'user', content: msg });
           cc.saveMessage(projectId, { role: 'user', content: msg, timestamp: Date.now() });
           cc.streaming[projectId] = { text: '', tools: [], active: true };
-          renderCcChat();
-          // Hide send, show stop immediately
-          const sendBtn = $('#ccSendBtn');
-          const stopBtn = $('#ccStopBtn');
-          if (sendBtn) sendBtn.style.display = 'none';
-          if (stopBtn) stopBtn.style.display = '';
+          renderCcChatFull(); // full rebuild to show new user message + streaming bubble
+          ccShowActivity('Thinking...');
+          ccShowStop();
 
           try {
-            // Inject portal context on first message of session
             let sendMsg = msg;
             if (cc.chats[projectId].filter(m => m.role === 'user').length === 1) {
               sendMsg = buildPortalContext() + msg;
@@ -2301,11 +2419,9 @@
           } catch (err) {
             cc.streaming[projectId] = { text: '', tools: [], active: false };
             cc.chats[projectId].push({ role: 'assistant', content: `Connection error: ${err.message}`, tools: [] });
-            renderCcChat();
-            const sendBtn = $('#ccSendBtn');
-            const stopBtn = $('#ccStopBtn');
-            if (sendBtn) sendBtn.style.display = '';
-            if (stopBtn) stopBtn.style.display = 'none';
+            renderCcChatFull();
+            ccHideActivity();
+            ccShowSend();
           }
         }
 
@@ -2330,13 +2446,16 @@
         if (ccResetBtn) ccResetBtn.addEventListener('click', async () => {
           cc.chats[projectId] = [];
           cc.streaming[projectId] = { text: '', tools: [], active: false };
+          _ccRenderedCount = 0;
+          _ccStreamEl = null;
           try {
             await cc.reset(projectId);
-            // Clear shared history on CC server too
             const key = cc.keyFor(projectId);
             if (key) await cc.api(`/api/history/${encodeURIComponent(key)}`, { method: 'DELETE' });
           } catch {}
-          renderCcChat();
+          renderCcChatFull();
+          ccHideActivity();
+          ccShowSend();
         });
       }
 

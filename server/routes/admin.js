@@ -780,7 +780,10 @@ router.get('/tickets/:ticketId', (req, res) => {
   if (!ticket) return res.status(404).json({ success: false, error: 'Not found' });
 
   const comments = db.prepare(`
-    SELECT c.*, u.name as user_name, u.email as user_email, u.role as user_role
+    SELECT c.*,
+      CASE WHEN c.user_id = 0 THEN 'Development Team' ELSE u.name END as user_name,
+      CASE WHEN c.user_id = 0 THEN NULL ELSE u.email END as user_email,
+      CASE WHEN c.user_id = 0 THEN 'staff' ELSE u.role END as user_role
     FROM ticket_comments c LEFT JOIN users u ON u.id = c.user_id
     WHERE c.ticket_id = ? ORDER BY c.created_at
   `).all(ticket.id);

@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDb, generateId, logActivity } = require('../db');
 const { requireDevAuth, rateLimit } = require('../middleware/auth');
+const { sendTicketResolvedEmail } = require('../utils/email');
 
 const router = express.Router();
 
@@ -201,17 +202,27 @@ router.post('/progress', (req, res) => {
 // ===== TICKETS =====
 
 // POST /api/dev/tickets/:ticketId/resolve — mark ticket as completed
+// Accepts: { resolution_notes, client_message }
+// - client_message: friendly message the client will see (e.g. "We fixed the crash...")
+// - resolution_notes: internal technical notes (fallback if no client_message)
 router.post('/tickets/:ticketId/resolve', (req, res) => {
   const db = getDb();
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.ticketId);
   if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' });
 
-  const { resolution_notes } = req.body;
+  const { resolution_notes, client_message } = req.body;
+  const publicMessage = client_message || resolution_notes;
 
-  // Add resolution as a public comment
-  if (resolution_notes) {
+  // Add resolution as a public comment visible to client (user_id=0 = system/dev comment)
+  if (publicMessage) {
     db.prepare('INSERT INTO ticket_comments (id, ticket_id, user_id, body, is_internal) VALUES (?, ?, 0, ?, 0)')
-      .run(generateId(), ticket.id, `[Resolved] ${resolution_notes}`);
+      .run(generateId(), ticket.id, publicMessage);
+  }
+
+  // Also add internal technical notes if both were provided
+  if (client_message && resolution_notes) {
+    db.prepare('INSERT INTO ticket_comments (id, ticket_id, user_id, body, is_internal) VALUES (?, ?, 0, ?, 1)')
+      .run(generateId(), ticket.id, `[Technical] ${resolution_notes}`);
   }
 
   // Close the ticket
@@ -225,6 +236,27 @@ router.post('/tickets/:ticketId/resolve', (req, res) => {
   });
 
   res.json({ success: true, data: { message: 'Ticket resolved' } });
+
+  // Notify client org members via email (async, non-blocking)
+  try {
+    const project = db.prepare('SELECT p.name, p.org_id FROM projects p WHERE p.id = ?').get(ticket.project_id);
+    if (project && project.org_id) {
+      const clientUsers = db.prepare("SELECT email FROM users WHERE org_id = ? AND role = 'client'").all(project.org_id);
+      const clientEmails = clientUsers.map(u => u.email).filter(Boolean);
+      if (clientEmails.length && publicMessage) {
+        sendTicketResolvedEmail({
+          clientEmails,
+          projectName: project.name,
+          ticketNumber: ticket.ticket_number,
+          title: ticket.title,
+          clientMessage: publicMessage,
+          portalUrl: 'https://kahalany.dev/portal'
+        }).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error('[DEV] Failed to send ticket resolved email:', err.message);
+  }
 });
 
 // GET /api/dev/tickets/:ticketId/full — complete ticket with all comments

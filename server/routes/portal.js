@@ -81,7 +81,8 @@ router.get('/projects/:projectId', enforceOrgScope, (req, res) => {
   const openTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE project_id = ? AND status IN ('open','in_progress')").get(project.id).c;
 
   const recentActivity = db.prepare(`
-    SELECT a.action, a.entity_type, a.details, a.created_at, u.name as user_name
+    SELECT a.action, a.entity_type, a.details, a.created_at,
+      COALESCE(u.name, 'Development Team') as user_name
     FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
     WHERE a.project_id = ? AND a.action NOT LIKE '%internal%'
     ORDER BY a.created_at DESC LIMIT 15
@@ -263,7 +264,9 @@ router.get('/projects/:projectId/tickets/:ticketId', enforceOrgScope, (req, res)
 
   // Clients only see public comments (is_internal = 0)
   const comments = db.prepare(`
-    SELECT c.id, c.body, c.created_at, u.name as user_name, u.role as user_role
+    SELECT c.id, c.body, c.created_at,
+      CASE WHEN c.user_id = 0 THEN 'Development Team' ELSE u.name END as user_name,
+      CASE WHEN c.user_id = 0 THEN 'staff' ELSE u.role END as user_role
     FROM ticket_comments c LEFT JOIN users u ON u.id = c.user_id
     WHERE c.ticket_id = ? AND c.is_internal = 0
     ORDER BY c.created_at
@@ -314,7 +317,8 @@ router.get('/projects/:projectId/activity', enforceOrgScope, (req, res) => {
   const offset = (page - 1) * limit;
 
   const activities = db.prepare(`
-    SELECT a.action, a.entity_type, a.entity_id, a.details, a.created_at, u.name as user_name
+    SELECT a.action, a.entity_type, a.entity_id, a.details, a.created_at,
+      COALESCE(u.name, 'Development Team') as user_name
     FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
     WHERE a.project_id = ? AND a.action NOT LIKE '%internal%'
     ORDER BY a.created_at DESC LIMIT ? OFFSET ?

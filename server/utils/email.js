@@ -126,4 +126,33 @@ function sendTicketNotification({ adminEmails, projectName, ticketNumber, title,
   return Promise.allSettled(promises);
 }
 
-module.exports = { sendEmail, sendWelcomeEmail, sendPasswordResetEmail, sendTicketNotification, getSmtpConfig, emailWrapper };
+function sendTicketResolvedEmail({ clientEmails, projectName, ticketNumber, title, clientMessage, portalUrl }) {
+  const promises = clientEmails.map(email => sendEmail({
+    to: email,
+    subject: `[${projectName}] Ticket #${ticketNumber} resolved: ${title}`,
+    html: emailWrapper(`
+      <p style="color:#a1a1aa;font-size:13px;text-align:center;margin:-16px 0 24px">Ticket Resolved</p>
+      <p style="margin-bottom:20px">A ticket in <strong style="color:#fff">${projectName}</strong> has been resolved:</p>
+      <div style="background:#18181b;border:1px solid #232329;border-radius:8px;padding:16px;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:600;color:#fff;margin-bottom:4px">#${ticketNumber} — ${title}</div>
+        <div style="font-size:11px;color:#22c55e;font-weight:600;margin-bottom:12px">RESOLVED</div>
+        <div style="color:#a1a1aa;font-size:13px;line-height:1.6;border-top:1px solid #232329;padding-top:12px">
+          <strong style="color:#e4e4e7">Development Team:</strong><br>
+          ${clientMessage}
+        </div>
+      </div>
+      ${portalUrl ? `
+      <div style="text-align:center;margin:24px 0">
+        <a href="${portalUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">View in Portal</a>
+      </div>
+      ` : ''}
+      <p style="color:#52525b;font-size:12px;margin-top:20px;border-top:1px solid #232329;padding-top:16px">
+        If this doesn't fully resolve your issue, you can open a new ticket from the portal.
+      </p>
+    `)
+  }));
+
+  return Promise.allSettled(promises);
+}
+
+module.exports = { sendEmail, sendWelcomeEmail, sendPasswordResetEmail, sendTicketNotification, sendTicketResolvedEmail, getSmtpConfig, emailWrapper };
