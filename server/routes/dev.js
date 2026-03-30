@@ -202,12 +202,19 @@ router.post('/progress', (req, res) => {
 // ===== TICKETS =====
 
 // POST /api/dev/tickets/:ticketId/resolve — mark ticket as completed
-// Accepts: { resolution_notes, client_message }
+// Accepts: { resolution_notes, client_message, project_id }
+// - ticketId param can be a UUID (id) or a ticket number (e.g. "1")
+// - If using ticket number, project_id must be provided in the body
 // - client_message: friendly message the client will see (e.g. "We fixed the crash...")
 // - resolution_notes: internal technical notes (fallback if no client_message)
 router.post('/tickets/:ticketId/resolve', (req, res) => {
   const db = getDb();
-  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.ticketId);
+  let ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.ticketId);
+  // Fall back to ticket_number + project_id lookup
+  if (!ticket && req.body.project_id) {
+    ticket = db.prepare('SELECT * FROM tickets WHERE ticket_number = ? AND project_id = ?')
+      .get(parseInt(req.params.ticketId), req.body.project_id);
+  }
   if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' });
 
   const { resolution_notes, client_message } = req.body;

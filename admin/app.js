@@ -2346,6 +2346,35 @@
           renderCcChatDone();
           ccHideActivity();
           ccShowSend();
+
+          // Auto-refresh project data after Claude Code finishes (tickets/milestones may have changed)
+          setTimeout(async () => {
+            try {
+              // Refresh tickets table
+              const tsEl = $('#ticketsSection');
+              if (tsEl) {
+                const ticketsRes = await api(`/admin/projects/${projectId}/tickets`);
+                const tickets = ticketsRes.data.tickets;
+                tsEl.innerHTML = tickets.length === 0 ? '<p style="color:var(--text-dim);font-size:13px">No tickets yet.</p>' : `
+                  <div class="table-wrap"><table>
+                    <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Updated</th></tr></thead>
+                    <tbody>${tickets.map(t => `<tr data-ticket-href="#/tickets/${t.id}" style="cursor:pointer">
+                      <td style="font-family:var(--mono);font-size:12px">${t.ticket_number}</td>
+                      <td style="color:var(--text)">${escapeHtml(t.title)}</td>
+                      <td><span class="badge badge-gray">${t.type.replace(/_/g,' ')}</span></td>
+                      <td><span class="badge ${t.priority==='high'||t.priority==='urgent'?'badge-red':t.priority==='medium'?'badge-yellow':'badge-gray'}">${t.priority}</span></td>
+                      <td><span class="badge ${t.status==='open'?'badge-blue':t.status==='in_progress'?'badge-yellow':t.status==='completed'||t.status==='closed'?'badge-green':'badge-gray'}">${t.status.replace(/_/g,' ')}</span></td>
+                      <td>${escapeHtml(t.assigned_to_name || '-')}</td>
+                      <td>${timeAgo(t.updated_at)}</td>
+                    </tr>`).join('')}</tbody>
+                  </table></div>
+                `;
+                $$('[data-ticket-href]').forEach(r => r.addEventListener('click', () => {
+                  window.location.hash = r.dataset.ticketHref;
+                }));
+              }
+            } catch {}
+          }, 2000);
         });
 
         // Sync: reload history when Desktop/PWA saves a message
