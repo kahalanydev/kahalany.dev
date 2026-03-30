@@ -153,7 +153,7 @@
     return map[action] || '&#8226;';
   }
 
-  const phaseSteps = ['planning','proposed','approved','in_progress','review','completed'];
+  const phaseSteps = ['planning','proposed','approved','in_progress','review','completed','maintenance'];
   function phaseIndicator(status) {
     const idx = phaseSteps.indexOf(status);
     return `<div class="phase-bar">${phaseSteps.map((s, i) => `
