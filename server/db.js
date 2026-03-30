@@ -207,6 +207,14 @@ function initSchema() {
     );
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS contact_dismissals (
+      contact_id INTEGER PRIMARY KEY REFERENCES contact_submissions(id),
+      dismissed_by INTEGER REFERENCES users(id),
+      dismissed_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
   // ===== PORTAL TABLES =====
 
   db.run(`

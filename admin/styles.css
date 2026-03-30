@@ -355,6 +355,8 @@ body {
   margin-top: 4px;
 }
 
+.dash-attention-row:hover { background: var(--surface-2); border-radius: var(--radius); }
+
 /* ===== CARDS / PANELS ===== */
 .card {
   background: var(--surface);

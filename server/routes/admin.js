@@ -13,63 +13,100 @@ router.use(requireRole('admin', 'staff'));
 router.get('/dashboard', (req, res) => {
   const db = getDb();
 
+  // --- Site traffic (compact) ---
   const visitors = {
     today: db.prepare("SELECT COUNT(*) as c FROM visits WHERE created_at >= datetime('now', '-1 day') AND is_bot = 0").get().c,
     week: db.prepare("SELECT COUNT(*) as c FROM visits WHERE created_at >= datetime('now', '-7 days') AND is_bot = 0").get().c,
     month: db.prepare("SELECT COUNT(*) as c FROM visits WHERE created_at >= datetime('now', '-30 days') AND is_bot = 0").get().c,
-    total: db.prepare("SELECT COUNT(*) as c FROM visits WHERE is_bot = 0").get().c
   };
-
-  const pageViews = {
-    today: db.prepare("SELECT COUNT(*) as c FROM events WHERE event_type = 'pageview' AND created_at >= datetime('now', '-1 day')").get().c,
-    week: db.prepare("SELECT COUNT(*) as c FROM events WHERE event_type = 'pageview' AND created_at >= datetime('now', '-7 days')").get().c,
-    month: db.prepare("SELECT COUNT(*) as c FROM events WHERE event_type = 'pageview' AND created_at >= datetime('now', '-30 days')").get().c
-  };
-
-  // Average time on site (from heartbeat/leave events in last 30 days)
   const avgTime = db.prepare(`
     SELECT AVG(CAST(json_extract(metadata, '$.timeOnPage') AS INTEGER)) as avg_time
-    FROM events
-    WHERE event_type = 'leave' AND created_at >= datetime('now', '-30 days')
+    FROM events WHERE event_type = 'leave' AND created_at >= datetime('now', '-30 days')
       AND json_extract(metadata, '$.timeOnPage') IS NOT NULL
   `).get();
+  const activeNow = db.prepare("SELECT COUNT(DISTINCT session_id) as c FROM events WHERE created_at >= datetime('now', '-5 minutes')").get().c;
 
-  // Recent visitors (last 20)
-  const recentVisitors = db.prepare(`
-    SELECT v.id, v.ip, v.country, v.city, v.browser, v.os, v.device_type, v.referrer, v.is_bot, v.created_at
-    FROM visits v
-    ORDER BY v.created_at DESC
-    LIMIT 20
-  `).all();
+  // --- Business metrics ---
+  const activeProjects = db.prepare("SELECT COUNT(*) as c FROM projects WHERE status IN ('in_progress', 'review')").get().c;
+  const openTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE status IN ('open', 'in_progress')").get().c;
+  const pendingApprovals = db.prepare("SELECT COUNT(*) as c FROM projects WHERE status = 'proposed'").get().c;
+  const unreadContacts = db.prepare("SELECT COUNT(*) as c FROM contact_submissions WHERE id NOT IN (SELECT COALESCE(contact_id, 0) FROM contact_dismissals)").get().c;
 
-  // Top referrers (last 30 days)
-  const topReferrers = db.prepare(`
-    SELECT referrer, COUNT(*) as count
-    FROM visits
-    WHERE referrer IS NOT NULL AND referrer != '' AND created_at >= datetime('now', '-30 days') AND is_bot = 0
-    GROUP BY referrer
-    ORDER BY count DESC
+  // --- Needs attention ---
+  const urgentTickets = db.prepare(`
+    SELECT t.id, t.ticket_number, t.title, t.priority, t.status, t.created_at,
+           p.name as project_name, p.id as project_id
+    FROM tickets t JOIN projects p ON t.project_id = p.id
+    WHERE t.status IN ('open', 'in_progress') AND t.priority IN ('high', 'urgent')
+    ORDER BY CASE t.priority WHEN 'urgent' THEN 0 ELSE 1 END, t.created_at ASC
     LIMIT 10
   `).all();
 
-  // Active visitors (last 5 minutes based on recent events)
-  const activeNow = db.prepare(`
-    SELECT COUNT(DISTINCT session_id) as c
-    FROM events
-    WHERE created_at >= datetime('now', '-5 minutes')
-  `).get().c;
+  const overdueMilestones = db.prepare(`
+    SELECT m.id, m.title, m.target_date, p.name as project_name, p.id as project_id
+    FROM milestones m JOIN projects p ON m.project_id = p.id
+    WHERE m.status = 'in_progress' AND m.target_date IS NOT NULL AND m.target_date < datetime('now')
+    ORDER BY m.target_date ASC
+    LIMIT 10
+  `).all();
+
+  const waitingApprovals = db.prepare(`
+    SELECT p.id, p.name, p.status, p.updated_at, o.name as org_name
+    FROM projects p JOIN organizations o ON p.org_id = o.id
+    WHERE p.status = 'proposed'
+    ORDER BY p.updated_at ASC
+  `).all();
+
+  const recentContacts = db.prepare(`
+    SELECT cs.id, cs.name, cs.email, cs.message, cs.created_at
+    FROM contact_submissions cs
+    ORDER BY cs.created_at DESC
+    LIMIT 10
+  `).all();
+
+  // --- Active projects ---
+  const projects = db.prepare(`
+    SELECT p.id, p.name, p.status, p.progress_percent, o.name as org_name,
+      (SELECT COUNT(*) FROM tickets t WHERE t.project_id = p.id AND t.status IN ('open', 'in_progress')) as open_tickets
+    FROM projects p JOIN organizations o ON p.org_id = o.id
+    WHERE p.status IN ('planning', 'proposed', 'approved', 'in_progress', 'review')
+    ORDER BY CASE p.status WHEN 'in_progress' THEN 0 WHEN 'review' THEN 1 WHEN 'approved' THEN 2 WHEN 'proposed' THEN 3 ELSE 4 END, p.updated_at DESC
+  `).all();
+
+  // --- Recent activity (across all projects) ---
+  const recentActivity = db.prepare(`
+    SELECT a.action, a.entity_type, a.details, a.created_at,
+           COALESCE(u.name, u.email, 'System') as user_name,
+           p.name as project_name, p.id as project_id
+    FROM activity_log a
+    LEFT JOIN users u ON a.user_id = u.id
+    LEFT JOIN projects p ON a.project_id = p.id
+    ORDER BY a.created_at DESC
+    LIMIT 20
+  `).all();
+
+  // --- Recent visitors (slim) ---
+  const recentVisitors = db.prepare(`
+    SELECT ip, country, city, browser, device_type, is_bot, created_at
+    FROM visits ORDER BY created_at DESC LIMIT 8
+  `).all();
 
   res.json({
     success: true,
     data: {
-      visitors,
-      pageViews,
-      avgTimeOnSite: Math.round(avgTime.avg_time || 0),
-      activeNow,
-      recentVisitors,
-      topReferrers
+      visitors, avgTimeOnSite: Math.round(avgTime.avg_time || 0), activeNow,
+      activeProjects, openTickets, pendingApprovals, unreadContacts,
+      urgentTickets, overdueMilestones, waitingApprovals, recentContacts,
+      projects, recentActivity, recentVisitors
     }
   });
+});
+
+// POST /api/admin/contacts/:id/dismiss
+router.post('/contacts/:id/dismiss', (req, res) => {
+  const db = getDb();
+  db.prepare('INSERT OR IGNORE INTO contact_dismissals (contact_id, dismissed_by) VALUES (?, ?)').run(req.params.id, req.user.id);
+  res.json({ success: true });
 });
 
 // GET /api/admin/security

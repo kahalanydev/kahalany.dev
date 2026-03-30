@@ -572,10 +572,7 @@
   // ===== RENDER: DASHBOARD =====
   async function renderDashboard() {
     renderLayout(`
-      <div class="page-header">
-        <h1>Dashboard</h1>
-        <p>Overview of your site activity</p>
-      </div>
+      <div class="page-header"><h1>Dashboard</h1><p>Command center</p></div>
       <div class="loading"><div class="spinner"></div> Loading data...</div>
     `);
 
@@ -583,55 +580,161 @@
       const res = await api('/admin/dashboard');
       const d = res.data;
 
+      const statusColors = { planning: 'badge-gray', proposed: 'badge-yellow', approved: 'badge-blue', in_progress: 'badge-blue', review: 'badge-yellow', completed: 'badge-green', maintenance: 'badge-green', archived: 'badge-gray' };
+
+      // Build needs-attention items
+      const attentionItems = [];
+      d.urgentTickets.forEach(t => attentionItems.push({
+        icon: t.priority === 'urgent' ? '&#9888;' : '&#9679;',
+        color: 'var(--danger)',
+        text: `<strong>#${t.ticket_number}</strong> ${escapeHtml(t.title)}`,
+        sub: `${escapeHtml(t.project_name)} &middot; ${t.priority} &middot; ${timeAgo(t.created_at)}`,
+        href: `#/tickets/${t.id}`
+      }));
+      d.overdueMilestones.forEach(m => attentionItems.push({
+        icon: '&#9200;',
+        color: 'var(--warning)',
+        text: `<strong>Overdue:</strong> ${escapeHtml(m.title)}`,
+        sub: `${escapeHtml(m.project_name)} &middot; due ${escapeHtml(m.target_date)}`,
+        href: `#/projects/${m.project_id}`
+      }));
+      d.waitingApprovals.forEach(p => attentionItems.push({
+        icon: '&#9993;',
+        color: 'var(--info)',
+        text: `<strong>Awaiting approval:</strong> ${escapeHtml(p.name)}`,
+        sub: `${escapeHtml(p.org_name)} &middot; proposed ${timeAgo(p.updated_at)}`,
+        href: `#/projects/${p.id}`
+      }));
+      const newContacts = d.recentContacts.filter(c => !c.dismissed);
+
       $('#mainContent').innerHTML = `
-        <div class="page-header">
-          <h1>Dashboard</h1>
-          <p>Overview of your site activity</p>
-        </div>
+        <div class="page-header"><h1>Dashboard</h1><p>Command center</p></div>
+
+        <!-- Top metrics -->
         <div class="metrics-grid">
           <div class="metric-card">
-            <div class="metric-label">Active Now</div>
-            <div class="metric-value accent">${d.activeNow}</div>
-            <div class="metric-sub">visitors in last 5 min</div>
+            <div class="metric-label">Active Projects</div>
+            <div class="metric-value accent">${d.activeProjects}</div>
+            <div class="metric-sub">in progress or review</div>
           </div>
           <div class="metric-card">
-            <div class="metric-label">Today</div>
+            <div class="metric-label">Open Tickets</div>
+            <div class="metric-value${d.openTickets > 0 ? ' warning' : ''}">${d.openTickets}</div>
+            <div class="metric-sub">need resolution</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Pending Approvals</div>
+            <div class="metric-value${d.pendingApprovals > 0 ? ' info' : ''}">${d.pendingApprovals}</div>
+            <div class="metric-sub">plans waiting on client</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">New Leads</div>
+            <div class="metric-value${d.unreadContacts > 0 ? ' accent' : ''}">${d.unreadContacts}</div>
+            <div class="metric-sub">contact submissions</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Visitors Today</div>
             <div class="metric-value">${d.visitors.today}</div>
-            <div class="metric-sub">visitors today</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">This Week</div>
-            <div class="metric-value">${d.visitors.week}</div>
-            <div class="metric-sub">visitors this week</div>
+            <div class="metric-sub">${d.activeNow} active now</div>
           </div>
           <div class="metric-card">
             <div class="metric-label">This Month</div>
             <div class="metric-value">${d.visitors.month}</div>
-            <div class="metric-sub">visitors this month</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Avg Time on Site</div>
-            <div class="metric-value info">${d.avgTimeOnSite}s</div>
-            <div class="metric-sub">average session</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Total Visitors</div>
-            <div class="metric-value">${d.visitors.total}</div>
-            <div class="metric-sub">all time (humans)</div>
+            <div class="metric-sub">avg ${d.avgTimeOnSite}s per session</div>
           </div>
         </div>
+
+        <!-- Needs Attention -->
+        ${attentionItems.length > 0 ? `
+        <div class="card" style="border-color:var(--warning-dim)">
+          <div class="card-header">
+            <span class="card-title" style="color:var(--warning)">Needs Attention</span>
+            <span class="badge badge-yellow">${attentionItems.length}</span>
+          </div>
+          <div style="max-height:280px;overflow-y:auto">
+            ${attentionItems.map(item => `
+              <a href="${item.href}" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--surface-3);text-decoration:none;cursor:pointer" class="dash-attention-row">
+                <span style="color:${item.color};font-size:16px;line-height:1;flex-shrink:0;margin-top:2px">${item.icon}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;color:var(--text)">${item.text}</div>
+                  <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${item.sub}</div>
+                </div>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+        ` : `
+        <div class="card" style="border-color:var(--success-dim)">
+          <div style="padding:16px;text-align:center;color:var(--text-dim);font-size:13px">
+            All clear — no urgent items need your attention.
+          </div>
+        </div>
+        `}
+
         <div class="grid-2">
+          <!-- Active Projects -->
           <div class="card">
-            <div class="card-header"><span class="card-title">Recent Visitors</span></div>
+            <div class="card-header">
+              <span class="card-title">Active Projects</span>
+              <a href="#/projects" style="font-size:12px;color:var(--accent);text-decoration:none">View all</a>
+            </div>
+            ${d.projects.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;padding:8px 0">No active projects.</p>' : `
+              <div style="max-height:320px;overflow-y:auto">
+                ${d.projects.map(p => `
+                  <a href="#/projects/${p.id}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface-3);text-decoration:none;cursor:pointer" class="dash-attention-row">
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(p.name)}</div>
+                      <div style="font-size:11px;color:var(--text-dim)">${escapeHtml(p.org_name)}</div>
+                    </div>
+                    <div style="width:80px">
+                      <div style="height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden">
+                        <div style="height:100%;width:${p.progress_percent}%;background:var(--accent);border-radius:2px"></div>
+                      </div>
+                      <div style="font-size:10px;color:var(--text-dim);text-align:right;margin-top:2px">${p.progress_percent}%</div>
+                    </div>
+                    <span class="badge ${statusColors[p.status] || 'badge-gray'}" style="font-size:10px;white-space:nowrap">${p.status.replace(/_/g, ' ')}</span>
+                    ${p.open_tickets > 0 ? `<span class="badge badge-yellow" style="font-size:10px">${p.open_tickets} tickets</span>` : ''}
+                  </a>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">Recent Activity</span></div>
+            ${d.recentActivity.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;padding:8px 0">No activity yet.</p>' : `
+              <div style="max-height:320px;overflow-y:auto">
+                ${d.recentActivity.map(a => `
+                  <div style="padding:8px 0;border-bottom:1px solid var(--surface-3);font-size:13px">
+                    <div style="color:var(--text-secondary)">
+                      <strong style="color:var(--text)">${escapeHtml(a.user_name)}</strong> ${escapeHtml(a.action.replace(/_/g, ' '))}
+                    </div>
+                    <div style="font-size:11px;color:var(--text-dim);margin-top:2px">
+                      ${a.project_name ? `<a href="#/projects/${a.project_id}" style="color:var(--accent);text-decoration:none">${escapeHtml(a.project_name)}</a> &middot; ` : ''}${timeAgo(a.created_at)}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Recent Visitors -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Recent Visitors</span>
+              <a href="#/analytics" style="font-size:12px;color:var(--accent);text-decoration:none">Analytics</a>
+            </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>IP</th><th>Location</th><th>Browser</th><th>Device</th><th>When</th></tr></thead>
+                <thead><tr><th>IP</th><th>Location</th><th>Device</th><th>When</th></tr></thead>
                 <tbody>
-                  ${d.recentVisitors.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">No visitors yet</td></tr>' :
+                  ${d.recentVisitors.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No visitors yet</td></tr>' :
                     d.recentVisitors.map(v => `<tr>
                       <td><span class="mono">${escapeHtml(v.ip)}</span> ${v.is_bot ? '<span class="badge badge-yellow">bot</span>' : ''}</td>
                       <td>${escapeHtml(v.country ? `${v.city || ''}, ${v.country}` : 'Unknown')}</td>
-                      <td>${escapeHtml(truncate(v.browser, 20))}</td>
                       <td>${escapeHtml(v.device_type)}</td>
                       <td>${timeAgo(v.created_at)}</td>
                     </tr>`).join('')}
@@ -639,23 +742,45 @@
               </table>
             </div>
           </div>
+
+          <!-- Contact Submissions -->
           <div class="card">
-            <div class="card-header"><span class="card-title">Top Referrers</span></div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>Source</th><th>Visits</th></tr></thead>
-                <tbody>
-                  ${d.topReferrers.length === 0 ? '<tr><td colspan="2" style="text-align:center;color:var(--text-dim)">No referrer data yet</td></tr>' :
-                    d.topReferrers.map(r => `<tr>
-                      <td>${escapeHtml(truncate(r.referrer, 50))}</td>
-                      <td><strong>${r.count}</strong></td>
-                    </tr>`).join('')}
-                </tbody>
-              </table>
+            <div class="card-header">
+              <span class="card-title">Contact Submissions</span>
+              ${d.unreadContacts > 0 ? `<span class="badge badge-green">${d.unreadContacts} new</span>` : ''}
             </div>
+            ${d.recentContacts.length === 0 ? '<p style="color:var(--text-dim);font-size:13px;padding:8px 0">No submissions yet.</p>' : `
+              <div style="max-height:320px;overflow-y:auto">
+                ${d.recentContacts.map(c => `
+                  <div style="padding:10px 0;border-bottom:1px solid var(--surface-3)" data-contact-id="${c.id}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                      <div style="font-size:13px"><strong style="color:var(--text)">${escapeHtml(c.name)}</strong> <span style="color:var(--text-dim)">${escapeHtml(c.email)}</span></div>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:11px;color:var(--text-dim)">${timeAgo(c.created_at)}</span>
+                        <button class="btn btn-secondary btn-sm contact-dismiss" data-id="${c.id}" style="font-size:10px;padding:2px 8px">Dismiss</button>
+                      </div>
+                    </div>
+                    <div style="font-size:12px;color:var(--text-secondary);line-height:1.4">${escapeHtml(truncate(c.message, 120))}</div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
           </div>
         </div>
       `;
+
+      // Dismiss contact handler
+      $$('.contact-dismiss').forEach(btn => btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          await api(`/admin/contacts/${btn.dataset.id}/dismiss`, { method: 'POST' });
+          const row = btn.closest('[data-contact-id]');
+          if (row) row.style.opacity = '0.4';
+          btn.disabled = true;
+          btn.textContent = 'Dismissed';
+        } catch {}
+      }));
+
     } catch (err) {
       $('#mainContent').innerHTML = `<div class="alert alert-error">Failed to load dashboard: ${escapeHtml(err.message)}</div>`;
     }
