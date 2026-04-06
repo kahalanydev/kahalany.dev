@@ -1,11 +1,56 @@
-# Kahalany.Dev — Application Map
+# kaymen.dev — Application Map
 
 ## Overview
-Portfolio/showcase website for Kahalany.Dev — a custom software development practice. Node.js/Express backend with SQLite analytics database, admin panel, and visitor tracking. Deployed via Docker on Coolify. Showcases 8 production projects with CSS device mockups, project filtering, and responsive design.
+Portfolio/showcase website for kaymen.dev (Kaymen Group LLC) — a custom software development practice. Node.js/Express backend with SQLite analytics database, admin panel, client portal, and visitor tracking. Deployed via Docker on Coolify. Showcases 11 production projects with CSS device mockups, project filtering, and responsive design. Both admin and portal are installable PWAs with mobile-first bottom navigation.
 
-- **Live URL**: https://kahalany.dev
+- **Live URL**: https://kaymen.dev (also https://kahalany.dev — legacy, parallel)
 - **Repo**: https://github.com/kahalanydev/kahalany.dev
 - **Coolify UUID**: `zcco40skss0o8wwocs40k4gs`
+
+## Domains & Subdomains
+
+| Domain | Points To | Purpose |
+|--------|-----------|---------|
+| `kaymen.dev` | `178.156.245.71` (A) | Main site + admin + portal |
+| `kahalany.dev` | `178.156.245.71` (A) | Legacy domain (parallel, to be retired) |
+| `nodeai.kaymen.dev` | wildcard A | NodeAI app |
+| `predictable.kaymen.dev` | wildcard A | Predictable stock analysis |
+| `davenen.kaymen.dev` | wildcard A | Davenen prayer partner app |
+| `shipai.kaymen.dev` | wildcard A | ShipHero AI warehouse assistant |
+| `pcg.kaymen.dev` | wildcard A | Passaic Clifton Gemach |
+| `torahtracker.kaymen.dev` | wildcard A | Torah Tracker |
+| `torahtracker.app` | A record | Torah Tracker (primary domain) |
+| `davenen.org` | external | Davenen (primary domain) |
+| `code.kaymen.dev` | Cloudflare Tunnel | Claude Code Desktop server |
+| `admin.kahalany.dev` | A record | Coolify dashboard |
+
+### DNS (Cloudflare — kaymen.dev zone)
+
+| Type | Name | Content | Proxy |
+|------|------|---------|-------|
+| A | `@` | `178.156.245.71` | DNS only |
+| A | `*` | `178.156.245.71` | DNS only |
+| CNAME | `code` | `[tunnel-id].cfargotunnel.com` | Proxied (auto) |
+| MX | `@` | Cloudflare Email Routing | — |
+
+### Email
+
+| Address | Forwards To |
+|---------|-------------|
+| `hello@kaymen.dev` | kahalanydev@gmail.com |
+| `hello@kahalany.dev` | kahalanydev@gmail.com |
+
+### Coolify App Registry
+
+| App | UUID | Domain(s) |
+|-----|------|-----------|
+| Main site | `zcco40skss0o8wwocs40k4gs` | `kahalany.dev, kaymen.dev` |
+| NodeAI | `gw840cgk8gscowck8kc80wo8` | `nodeai.kahalany.dev, nodeai.kaymen.dev` |
+| Predictable | `og8w4kkkccw4ckcsgw4ws8sw` | `predictable.kahalany.dev, predictable.kaymen.dev` |
+| Davenen | `cco0kccokg08okwsw8cssk48` | `davenen.kahalany.dev, davenen.kaymen.dev` |
+| ShipHero AI | `o00gossow4c8s888ws48okso` | `shipai.kahalany.dev, shipai.kaymen.dev` |
+| PCG | `nwg0s00oc8k8owo0sggkgkgg` | `pcg.kahalany.dev, pcg.kaymen.dev` |
+| Torah Tracker | `dc4ccksssskkww0ckc00sg4s` | `torahtracker.app, torahtracker.kahalany.dev, torahtracker.kaymen.dev` |
 
 ## Tech Stack
 - **Frontend** — vanilla HTML/CSS/JS, no framework, no build step
@@ -16,42 +61,47 @@ Portfolio/showcase website for Kahalany.Dev — a custom software development pr
 - **Fonts** — Inter (body) + JetBrains Mono (code/accents) via Google Fonts
 - **Deployment** — Node.js Docker container on Coolify (Hetzner VPS)
 - **SSL** — Let's Encrypt via Traefik (auto-provisioned)
-- **Domain** — kahalany.dev on Cloudflare (DNS only, not proxied)
-- **Email** — hello@kahalany.dev via Cloudflare Email Routing → kahalanydev@gmail.com
+- **Domain** — kaymen.dev on Cloudflare (DNS only, wildcard A record)
+- **Email** — hello@kaymen.dev via Cloudflare Email Routing → kahalanydev@gmail.com
 - **SMTP** — Nodemailer for outbound email (admin-configurable SMTP settings stored in DB)
 - **File Uploads** — Multer with UUID filenames, MIME whitelist, extension blacklist
+- **PWA** — Installable web apps for admin and portal (manifests, service workers, iOS meta tags)
 
 ## File Structure
 ```
 Kahalany.Dev Site/
-├── index.html              # Main site (single-page, 5 sections)
-├── styles.css              # All styles including CSS device mockups (~1400 lines)
-├── script.js               # Main site interactions: nav, filters, counters, animations
+├── index.html              # Main site (single-page, 6 sections + 9 portfolio cards)
+├── styles.css              # All styles including CSS device mockups
+├── script.js               # Main site interactions: nav, filters, counters, animations, contact form
 ├── tracker.js              # Lightweight analytics tracker (scroll, clicks, sections)
 ├── favicon.svg             # Branded "K" favicon (SVG)
 ├── server/
-│   ├── index.js            # Express entry point (port 8080), routes + static serving
-│   ├── db.js               # SQLite init, schema (17 tables), wrapper, admin seeding, helpers
+│   ├── index.js            # Express entry point (port 8080), routes + static serving, contact form with spam protection
+│   ├── db.js               # SQLite init, schema (17+ tables), wrapper, admin seeding, helpers
 │   ├── middleware/
 │   │   └── auth.js         # Auth: requireAuth, requireRole, enforceOrgScope, requireDevAuth, rateLimit
 │   ├── routes/
 │   │   ├── auth.js         # POST /api/auth/login, /change-password, GET/POST/DELETE /api/auth/users, SMTP config, Google OAuth
 │   │   ├── track.js        # POST /api/track/visit, /api/track/event
-│   │   ├── admin.js        # Admin API: dashboard, security, analytics, orgs, projects, milestones, tickets, plans, dev-keys
+│   │   ├── admin.js        # Admin API: dashboard, security, analytics, orgs, projects, milestones, tickets, plans, dev-keys, diagnostics
 │   │   ├── portal.js       # Portal API: dashboard, projects, tickets, comments, activity, plan approval
-│   │   ├── dev.js          # Dev API: sync, progress updates, ticket resolution (HMAC-signed)
+│   │   ├── dev.js          # Dev API: bootstrap, sync, progress, project update, bulk milestones, ticket resolution (HMAC-signed)
 │   │   └── uploads.js      # File upload/download/delete with auth-gated access
 │   └── utils/
 │       ├── detection.js    # Bot detection, rate tracking, suspicious activity logging
-│       └── email.js        # Nodemailer SMTP email (welcome, password reset, contact notifications)
+│       └── email.js        # Nodemailer SMTP email (welcome, password reset, contact, ticket notifications)
 ├── admin/
-│   ├── index.html          # Admin panel shell (loads Chart.js + app.js)
-│   ├── styles.css          # Admin dark theme styles
-│   └── app.js              # Admin SPA (dashboard, security, analytics, settings, projects, clients, tickets)
+│   ├── index.html          # Admin panel shell (PWA-enabled, loads Chart.js + app.js)
+│   ├── styles.css          # Admin dark/light theme styles + mobile card tables + bottom nav
+│   ├── app.js              # Admin SPA (dashboard, security, analytics, settings, projects, clients, tickets, Claude Code chat)
+│   ├── manifest.json       # PWA manifest (standalone, dark theme)
+│   └── sw.js               # Service worker (cache strategies, OAuth passthrough)
 ├── portal/
-│   ├── index.html          # Client portal shell
-│   ├── styles.css          # Portal dark theme styles (shared design system with admin)
-│   └── app.js              # Portal SPA (login, dashboard, projects, tickets, plans, activity)
+│   ├── index.html          # Client portal shell (PWA-enabled)
+│   ├── styles.css          # Portal dark/light theme styles + mobile card tables + bottom nav
+│   ├── app.js              # Portal SPA (login, dashboard, projects, tickets, plans, activity)
+│   ├── manifest.json       # PWA manifest (standalone, dark theme)
+│   └── sw.js               # Service worker (cache strategies)
 ├── data/
 │   └── analytics.db        # SQLite database (gitignored, persisted via Docker volume)
 ├── package.json            # Node.js deps: express, sql.js, bcryptjs, jsonwebtoken, helmet, etc.
@@ -79,9 +129,14 @@ Client → Traefik (SSL) → Express (:8080)
   ├── /api/portal/*        → portal data API (requires JWT + org-scoped access)
   ├── /api/dev/*           → dev API (requires HMAC signature, for Claude Code sync)
   ├── /api/uploads/*       → file upload/download/delete (auth-gated)
-  ├── /api/contact         → contact form submission (rate-limited, public)
+  ├── /api/contact         → contact form submission (rate-limited, honeypot + timing protected)
   └── 404                  → suspicious activity logger
 ```
+
+### Contact Form Spam Protection
+- **Honeypot field**: Hidden `_hp` input — bots filling all fields get a silent success (no error signal)
+- **Timing check**: Form sends `_t` (ms since page load) — submissions under 2 seconds silently succeed
+- **Lead tracking**: `project_name` field, `converted_at`/`converted_org_id` columns for future lead-to-client pipeline
 
 ### Database Schema (SQLite — 17 tables)
 
@@ -97,7 +152,7 @@ Client → Traefik (SSL) → Express (:8080)
 
 **Client Portal (new)**:
 - **organizations** — client companies
-- **projects** — with lifecycle status machine (planning → proposed → approved → in_progress → review → completed → maintenance → archived)
+- **projects** — with lifecycle status machine (planning → proposed → approved → in_progress → review → completed → maintenance → archived). Portal phase indicator renders all 7 active phases.
 - **project_members** — user-project assignments with roles
 - **milestones** — project phases with status and sort order
 - **tickets** — bug reports, feature requests, tasks, modifications, questions
@@ -144,13 +199,13 @@ Client → Traefik (SSL) → Express (:8080)
 ### 2. Hero
 - Rotating text animation: "ships" / "scales" / "works" / "lasts"
 - Green pulse "Available for new projects" badge
-- Animated counters: 14+ Production Apps, 6 Tech Stacks, 5 Live Platforms
+- Animated counters: 15+ Production Apps, 6 Tech Stacks, 6 Live Platforms
 - Two CTAs: "See Our Work" / "Start a Project" (tracked)
 - Subtle grid background + radial glow
 
 ### 3. Portfolio (Work)
 - **Filter bar**: All / Web Apps / Mobile / AI·ML / WordPress (tracked)
-- **8 project cards**, each with CSS device mockup, tech tags, status badge
+- **9 project cards**, each with CSS device mockup, tech tags, status badge
 - "View Live" links for deployed projects (tracked)
 - Filter uses `data-tags` attributes, JS toggles `.hidden` class
 
@@ -161,7 +216,8 @@ Client → Traefik (SSL) → Express (:8080)
 - 4-step vertical timeline
 
 ### 6. Contact ("What Do You Want to Build?")
-- "Describe your idea" form: name, email, message textarea
+- "Describe your idea" form: name, email, "What are you building?" (optional), message textarea
+- Honeypot + timing-based spam protection (invisible to users)
 - Submissions stored in DB + email notification sent to hello@kahalany.dev
 - Rate limited: 1 submission per minute per IP
 - "Or reach out directly" divider with:
@@ -203,14 +259,11 @@ Client → Traefik (SSL) → Express (:8080)
 - Browser breakdown table
 - Average scroll depth metric
 
-### Settings
-- Change password form
-- Users table: all users with role badges (admin/staff/client), status, reset PW, remove
-- SMTP configuration card (host, port, user, pass, from address) with test email button
-- Ticket Webhook URL (Slack, Discord, custom endpoints)
-- Google OAuth configuration (client ID, secret, enable/disable)
-- Dev Keys management (create, revoke HMAC keys for dev API)
-- **Claude Code Integration**: Server URL + pairing code, connection status, disconnect
+### Settings (sectioned layout)
+- **Account & Security**: Change password form + Google OAuth configuration (client ID, secret, enable/disable)
+- **Integrations**: Claude Code (server URL, pairing, connection status) + Notifications (SMTP config, ticket webhook URL)
+- **Dev Tools**: Dev Keys management (create, revoke HMAC keys) + Dev API Diagnostics (active keys, recent resolutions, open tickets, "Run Check" button)
+- **Team Management**: All users table with role badges (admin/staff/client), status, reset PW, remove, add new admin form
 
 ### Email & Notification System
 - **Nodemailer** with admin-configurable SMTP (settings stored in `config` table)
@@ -276,7 +329,8 @@ Client → Traefik (SSL) → Express (:8080)
 - Cross-org badge for users from other organizations
 
 ### Ticket Management
-- Status/priority/assignment controls
+- **Inline status change**: Project detail ticket rows have dropdown for instant status change without navigation
+- Status/priority/assignment controls on ticket detail page
 - Comment thread with internal note option (yellow-bordered)
 - Post as public or internal comment
 - Auto-notifications on creation (email + webhook)
@@ -298,6 +352,32 @@ Client → Traefik (SSL) → Express (:8080)
 - **Resolve script**: Node.js helper (`resolve-ticket.js`) handles HMAC signing natively — Claude Code runs it via `node .portal/scripts/resolve-ticket.js`
 - **Push sync**: Pushes dirty milestone updates + locally resolved tickets (falls back to ticket number when UUID missing)
 - **Credential refresh**: Updates `.portal.json` API credentials from Desktop store on every sync cycle
+
+## Dev API Endpoints (`/api/dev/*` — all HMAC-signed)
+- `POST /api/dev/bootstrap` — Create org + project in one call (idempotent)
+- `GET /api/dev/sync` — Pull changes since last sync (milestones, tickets, comments)
+- `GET /api/dev/projects/pending` — List approved but unscaffolded projects
+- `POST /api/dev/projects/:id/scaffolded` — Mark project as scaffolded, start first milestone
+- `POST /api/dev/projects/:id/update` — Update project metadata (status, dates, tech_stack, etc.)
+- `POST /api/dev/projects/:id/milestones` — Bulk create milestones (with optional `replace: true`)
+- `POST /api/dev/progress` — Push milestone updates with auto-progress recalculation
+- `POST /api/dev/tickets/:id/resolve` — Close ticket (accepts UUID or ticket number + project_id)
+- `GET /api/dev/tickets/:id/full` — Complete ticket detail with all comments
+- `POST /api/dev/activity` — Log dev events (code_pushed, deploy_triggered, etc.)
+
+## Mobile & PWA
+
+### Mobile Layout (≤768px)
+- **Card tables** (`.mobile-cards`): Tables transform into card-per-row layout. `thead` hidden, each `td` becomes flex row with column header via `content: attr(data-label)`
+- **Bottom navigation**: Fixed bottom bar with 5 main nav items (icon + label), replaces sidebar. Press feedback via `scale(0.88)` on `:active`. iPhone notch-safe via `env(safe-area-inset-bottom)`
+- **Mobile top bar**: Fixed top-right with theme toggle, settings gear, logout button
+- **Metrics grid**: Forces 2 columns on mobile (was single column)
+
+### PWA
+- **Manifests**: `display: standalone`, dark theme colors, favicon as icon
+- **Service workers**: Navigation passthrough (for OAuth), network-first API calls, stale-while-revalidate static assets
+- **iOS meta tags**: apple-mobile-web-app-capable, black-translucent status bar, viewport-fit=cover
+- **Theme-color sync**: Meta tag updates to match current dark/light theme
 
 ## Theming
 - **Dark/light mode** across all three frontends (main site, admin, portal)
