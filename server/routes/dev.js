@@ -22,7 +22,7 @@ router.post('/bootstrap', (req, res) => {
   let org = db.prepare('SELECT * FROM organizations WHERE name = ?').get(org_name);
   if (!org) {
     const orgId = generateId();
-    db.prepare('INSERT INTO organizations (id, name, primary_email) VALUES (?, ?, ?)').run(orgId, org_name, org_email || 'hello@kahalany.dev');
+    db.prepare('INSERT INTO organizations (id, name, primary_email) VALUES (?, ?, ?)').run(orgId, org_name, org_email || 'hello@kaymen.dev');
     org = { id: orgId, name: org_name };
   }
 
@@ -376,7 +376,7 @@ router.post('/tickets/:ticketId/resolve', (req, res) => {
           ticketNumber: ticket.ticket_number,
           title: ticket.title,
           clientMessage: publicMessage,
-          portalUrl: 'https://kahalany.dev/portal'
+          portalUrl: 'https://kaymen.dev/portal'
         }).catch(() => {});
       }
     }

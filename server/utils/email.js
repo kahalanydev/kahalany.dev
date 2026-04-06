@@ -53,7 +53,7 @@ function emailWrapper(innerHtml) {
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;border:1px solid #232329">
       <div style="text-align:center;margin-bottom:28px">
         <div style="font-size:24px;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace;margin:0">
-          <span style="color:#71717a">{</span> <span style="color:#e4e4e7">kahalany</span><span style="color:#3b82f6">.</span><span style="color:#e4e4e7">dev</span> <span style="color:#71717a">}</span>
+          <span style="color:#71717a">{</span> <span style="color:#e4e4e7">kaymen</span><span style="color:#3b82f6">.</span><span style="color:#e4e4e7">dev</span> <span style="color:#71717a">}</span>
         </div>
       </div>
       ${innerHtml}
@@ -67,7 +67,7 @@ function sendWelcomeEmail({ email, name, role, inviteUrl }) {
 
   return sendEmail({
     to: email,
-    subject: `You've been invited to Kahalany.Dev ${portalLabel}`,
+    subject: `You've been invited to kaymen.dev ${portalLabel}`,
     html: emailWrapper(`
       <p style="color:#a1a1aa;font-size:13px;text-align:center;margin:-16px 0 24px">${portalLabel}</p>
       <p>Hi ${displayName},</p>
@@ -88,7 +88,7 @@ function sendPasswordResetEmail({ email, name, inviteUrl }) {
 
   return sendEmail({
     to: email,
-    subject: 'Your Kahalany.Dev password has been reset',
+    subject: 'Your kaymen.dev password has been reset',
     html: emailWrapper(`
       <p>Hi ${displayName},</p>
       <p>Your password has been reset. Click below to set a new password:</p>

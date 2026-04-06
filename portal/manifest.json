@@ -1,7 +1,7 @@
 {
-  "name": "Kahalany.Dev Portal",
+  "name": "kaymen.dev Portal",
   "short_name": "KD Portal",
-  "description": "Client portal for kahalany.dev",
+  "description": "Client portal for kaymen.dev",
   "start_url": "/portal/",
   "display": "standalone",
   "background_color": "#09090b",

@@ -213,7 +213,7 @@ if ('serviceWorker' in navigator) {
       const res = await fetch(`${url}/api/auth/pair`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pairingCode: code, deviceName: 'Kahalany Admin Panel' })
+        body: JSON.stringify({ pairingCode: code, deviceName: 'Kaymen Admin Panel' })
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -406,7 +406,7 @@ if ('serviceWorker' in navigator) {
     app.innerHTML = `
       <div class="login-page">
         <div class="login-card">
-          <div class="login-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
+          <div class="login-logo"><span class="accent">{</span> kaymen.dev <span class="accent">}</span></div>
           <h2 class="login-title">Admin Login</h2>
           <div id="loginMsg">${oauthError ? `<div class="alert alert-error">${escapeHtml(errorMessages[oauthError] || 'Sign-in failed')}</div>` : ''}</div>
           ${googleEnabled ? `
@@ -483,7 +483,7 @@ if ('serviceWorker' in navigator) {
     app.innerHTML = `
       <div class="login-page">
         <div class="login-card">
-          <div class="login-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
+          <div class="login-logo"><span class="accent">{</span> kaymen.dev <span class="accent">}</span></div>
           <h2 class="login-title">Change Password</h2>
           <div class="alert alert-warning">You must change your password before continuing.</div>
           <div id="cpError"></div>
@@ -545,7 +545,7 @@ if ('serviceWorker' in navigator) {
       </div>
       <div class="layout">
         <aside class="sidebar" id="sidebar">
-          <div class="sidebar-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
+          <div class="sidebar-logo"><span class="accent">{</span> kaymen.dev <span class="accent">}</span></div>
           <div class="sidebar-label">Admin Panel</div>
           <ul class="sidebar-nav">
             ${navItems.map(n => `
@@ -1195,6 +1195,7 @@ if ('serviceWorker' in navigator) {
           <p>Manage your account, administrators, and integrations</p>
         </div>
 
+        <div class="settings-section-label" style="margin-top:0">Account & Security</div>
         <div class="grid-2">
           <div class="card">
             <div class="card-header"><span class="card-title">Change Password</span></div>
@@ -1217,201 +1218,200 @@ if ('serviceWorker' in navigator) {
           </div>
 
           <div class="card">
-            <div class="card-header">
-              <span class="card-title">Users</span>
-            </div>
-            <div id="usersMsg"></div>
-            <div class="table-wrap" style="margin-bottom:20px">
-              <table class="mobile-cards">
-                <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
-                <tbody>
-                  ${users.map(u => {
-                    const roleBadge = u.role === 'admin' ? '<span class="badge badge-blue">admin</span>'
-                      : u.role === 'staff' ? '<span class="badge badge-purple" style="background:rgba(168,85,247,0.15);color:#c084fc">staff</span>'
-                      : '<span class="badge badge-green">client</span>';
-                    return `<tr>
-                    <td data-label="Email">${escapeHtml(u.email)}</td>
-                    <td data-label="Name">${escapeHtml(u.name || '-')}</td>
-                    <td data-label="Role">${roleBadge}</td>
-                    <td data-label="Status">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
-                    <td data-label="">${u.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" data-reset-user="${u.id}" style="margin-right:4px">Reset PW</button><button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Remove</button>` : '<span class="badge badge-blue">you</span>'}</td>
-                  </tr>`;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
-            <div style="border-top:1px solid var(--border);padding-top:20px">
-              <h4 style="font-size:14px;margin-bottom:12px">Add New Admin</h4>
-              <form id="addUserForm" style="display:flex;gap:8px;flex-wrap:wrap">
-                <input type="email" id="newUserEmail" placeholder="Email" required style="flex:1;min-width:200px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
-                <input type="text" id="newUserName" placeholder="Name (optional)" style="flex:1;min-width:150px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
-                <button type="submit" class="btn btn-primary" style="width:auto">Add Admin</button>
-              </form>
-              <div id="newUserResult" style="margin-top:12px"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top:20px">
-          <div class="card-header"><span class="card-title">Google OAuth</span></div>
-          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
-            Allow clients (and admins) to sign in with their Google account. Users must be created first — Google login only works for existing accounts.
-          </p>
-          <div id="oauthMsg"></div>
-          <form id="oauthForm">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-              <div class="form-group" style="margin-bottom:0">
+            <div class="card-header"><span class="card-title">Google OAuth</span></div>
+            <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+              Allow clients (and admins) to sign in with their Google account. Users must be created first — Google login only works for existing accounts.
+            </p>
+            <div id="oauthMsg"></div>
+            <form id="oauthForm">
+              <div class="form-group">
                 <label>Google Client ID</label>
                 <input type="text" id="oauthClientId" value="${escapeHtml(oauth.google_client_id)}" placeholder="xxxx.apps.googleusercontent.com" style="font-family:var(--mono);font-size:12px">
               </div>
-              <div class="form-group" style="margin-bottom:0">
+              <div class="form-group">
                 <label>Client Secret ${oauth.google_client_secret_set ? '<span class="badge badge-green" style="margin-left:6px;font-size:10px">set</span>' : '<span class="badge badge-gray" style="margin-left:6px;font-size:10px">not set</span>'}</label>
                 <input type="password" id="oauthClientSecret" placeholder="${oauth.google_client_secret_set ? 'Leave blank to keep current' : 'Enter client secret'}" style="font-family:var(--mono);font-size:12px">
               </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:16px">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" id="oauthEnabled" ${oauth.google_oauth_enabled ? 'checked' : ''} style="width:auto">
-                Enable Google Sign-In
-              </label>
-              <button type="submit" class="btn btn-primary" style="width:auto">Save OAuth Settings</button>
-            </div>
-          </form>
-          ${oauth.google_oauth_enabled ? '<div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:var(--radius);font-size:12px;color:var(--text-dim)"><strong>Authorized redirect URI</strong> (add this in Google Cloud Console):<br><code style="color:var(--accent);font-family:var(--mono)">' + window.location.origin + '/api/auth/google/callback</code></div>' : ''}
-        </div>
-
-        <div class="card" style="margin-top:20px">
-          <div class="card-header"><span class="card-title">Notifications</span></div>
-          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
-            Configure email (SMTP) for invites and ticket alerts, and an optional webhook for ticket events.
-          </p>
-          <div id="smtpMsg"></div>
-          <form id="smtpForm">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-              <div class="form-group" style="margin-bottom:0">
-                <label>SMTP Host</label>
-                <input type="text" id="smtpHost" value="${escapeHtml(smtp.smtp_host)}" placeholder="smtp.gmail.com" style="font-family:var(--mono);font-size:12px">
+              <div style="display:flex;align-items:center;gap:16px">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+                  <input type="checkbox" id="oauthEnabled" ${oauth.google_oauth_enabled ? 'checked' : ''} style="width:auto">
+                  Enable Google Sign-In
+                </label>
+                <button type="submit" class="btn btn-primary" style="width:auto">Save OAuth Settings</button>
               </div>
-              <div class="form-group" style="margin-bottom:0">
-                <label>Port</label>
-                <input type="text" id="smtpPort" value="${escapeHtml(smtp.smtp_port)}" placeholder="587" style="font-family:var(--mono);font-size:12px;max-width:100px">
-              </div>
-              <div class="form-group" style="margin-bottom:0">
-                <label>Username</label>
-                <input type="text" id="smtpUser" value="${escapeHtml(smtp.smtp_user)}" placeholder="you@gmail.com" style="font-family:var(--mono);font-size:12px">
-              </div>
-              <div class="form-group" style="margin-bottom:0">
-                <label>Password ${smtp.smtp_pass_set ? '<span class="badge badge-green" style="margin-left:6px;font-size:10px">set</span>' : ''}</label>
-                <input type="password" id="smtpPass" placeholder="${smtp.smtp_pass_set ? 'Leave blank to keep' : 'App password'}" style="font-family:var(--mono);font-size:12px">
-              </div>
-            </div>
-            <div class="form-group" style="margin-bottom:16px">
-              <label>From Address</label>
-              <input type="text" id="smtpFrom" value="${escapeHtml(smtp.smtp_from)}" placeholder='"Kahalany.Dev" <hello@kahalany.dev>' style="font-family:var(--mono);font-size:12px">
-            </div>
-            <div style="display:flex;gap:8px">
-              <button type="submit" class="btn btn-primary" style="width:auto">Save SMTP</button>
-              <button type="button" class="btn btn-secondary" id="smtpTestBtn" style="width:auto">Send Test Email</button>
-            </div>
-          </form>
-          <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:20px">
-            <h4 style="font-size:14px;margin-bottom:8px">Ticket Webhook</h4>
-            <p style="color:var(--text-dim);font-size:12px;margin-bottom:12px">POST a JSON payload to this URL when a client creates a ticket. Works with Slack, Discord, or custom endpoints.</p>
-            <form id="webhookForm" style="display:flex;gap:8px">
-              <input type="url" id="webhookUrl" value="${escapeHtml(smtp.ticket_webhook_url)}" placeholder="https://hooks.slack.com/services/..." style="flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:12px">
-              <button type="submit" class="btn btn-primary" style="width:auto">Save</button>
             </form>
-            <div id="webhookMsg" style="margin-top:8px"></div>
+            ${oauth.google_oauth_enabled ? '<div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:var(--radius);font-size:12px;color:var(--text-dim)"><strong>Authorized redirect URI</strong> (add this in Google Cloud Console):<br><code style="color:var(--accent);font-family:var(--mono)">' + window.location.origin + '/api/auth/google/callback</code></div>' : ''}
           </div>
         </div>
 
-        <div class="card" style="margin-top:20px">
-          <div class="card-header">
-            <span class="card-title">Dev Keys</span>
-          </div>
-          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
-            HMAC API keys for Claude Code integration. Use these to connect the portal sync service.
-          </p>
-          <div id="devKeysMsg"></div>
-          ${devKeys.length ? `
-          <div class="table-wrap" style="margin-bottom:20px">
-            <table class="mobile-cards">
-              <thead><tr><th>Key ID</th><th>Label</th><th>Status</th><th>Last Used</th><th>Created</th><th></th></tr></thead>
-              <tbody>
-                ${devKeys.map(k => `<tr>
-                  <td data-label="Key ID"><code style="font-family:var(--mono);font-size:12px">${escapeHtml(k.key_id)}</code></td>
-                  <td data-label="Label">${escapeHtml(k.label || '-')}</td>
-                  <td data-label="Status">${k.revoked ? '<span class="badge badge-red">revoked</span>' : (k.expires_at && new Date(k.expires_at) < new Date() ? '<span class="badge badge-yellow">expired</span>' : '<span class="badge badge-green">active</span>')}</td>
-                  <td data-label="Last Used">${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'never'}</td>
-                  <td data-label="Created">${new Date(k.created_at).toLocaleDateString()}</td>
-                  <td data-label="">${!k.revoked ? `<button class="btn btn-danger btn-sm" data-revoke-key="${escapeHtml(k.key_id)}">Revoke</button>` : ''}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>` : '<p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">No dev keys yet.</p>'}
-          <div style="border-top:1px solid var(--border);padding-top:20px">
-            <h4 style="font-size:14px;margin-bottom:12px">Create New Key</h4>
-            <form id="createDevKeyForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
-              <div style="flex:1;min-width:200px">
-                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Label</label>
-                <input type="text" id="devKeyLabel" placeholder="e.g. Claude Code Desktop" style="width:100%;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
-              </div>
-              <div style="min-width:120px">
-                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Expires</label>
-                <select id="devKeyExpiry" style="width:100%;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
-                  <option value="">Never</option>
-                  <option value="30">30 days</option>
-                  <option value="90" selected>90 days</option>
-                  <option value="365">1 year</option>
-                </select>
-              </div>
-              <button type="submit" class="btn btn-primary" style="width:auto">Generate Key</button>
-            </form>
-            <div id="devKeyResult" style="margin-top:12px"></div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top:20px">
-          <div class="card-header">
-            <span class="card-title">Dev API Diagnostics</span>
-            <button class="btn btn-secondary btn-sm" id="runDevDiagBtn">Run Check</button>
-          </div>
-          <div id="devDiagResult" style="font-size:13px;color:var(--text-secondary)">Click "Run Check" to verify the dev API is working and see recent ticket resolution activity.</div>
-        </div>
-
-        <div class="card" style="margin-top:20px">
-          <div class="card-header">
-            <span class="card-title">Claude Code</span>
-            ${cc.isConnected() ? '<span class="badge badge-green">Connected</span>' : '<span class="badge badge-gray">Not connected</span>'}
-          </div>
-          <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
-            Connect your Claude Code server to get AI assistance directly from project pages.
-          </p>
-          <div id="ccMsg"></div>
-          ${cc.isConnected() ? `
-            <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius)">
-              <span style="color:var(--success);font-size:8px">&#11044;</span>
-              <code style="font-family:var(--mono);font-size:13px;color:var(--text-secondary);flex:1">${escapeHtml(cc.getServer())}</code>
-              <button class="btn btn-danger btn-sm" id="ccDisconnectBtn">Disconnect</button>
+        <div class="settings-section-label">Integrations</div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Claude Code</span>
+              ${cc.isConnected() ? '<span class="badge badge-green">Connected</span>' : '<span class="badge badge-gray">Not connected</span>'}
             </div>
-          ` : `
-            <form id="ccPairForm">
-              <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
-                <div class="form-group" style="margin-bottom:0">
+            <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+              Connect your Claude Code server to get AI assistance directly from project pages.
+            </p>
+            <div id="ccMsg"></div>
+            ${cc.isConnected() ? `
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius)">
+                <span style="color:var(--success);font-size:8px">&#11044;</span>
+                <code style="font-family:var(--mono);font-size:13px;color:var(--text-secondary);flex:1">${escapeHtml(cc.getServer())}</code>
+                <button class="btn btn-danger btn-sm" id="ccDisconnectBtn">Disconnect</button>
+              </div>
+            ` : `
+              <form id="ccPairForm">
+                <div class="form-group">
                   <label>Server URL</label>
-                  <input type="url" id="ccServerUrl" value="https://code.kahalany.dev" placeholder="https://code.kahalany.dev" style="font-family:var(--mono);font-size:12px">
+                  <input type="url" id="ccServerUrl" value="https://code.kaymen.dev" placeholder="https://code.kaymen.dev" style="font-family:var(--mono);font-size:12px">
                 </div>
-                <div class="form-group" style="margin-bottom:0">
+                <div class="form-group">
                   <label>Pairing Code</label>
                   <input type="text" id="ccPairCode" placeholder="000000" maxlength="6" style="font-family:var(--mono);font-size:16px;text-align:center;letter-spacing:4px">
                 </div>
+                <p style="color:var(--text-dim);font-size:12px;margin-bottom:12px">
+                  Open Claude Code Desktop &rarr; the 6-digit pairing code is shown on startup or in the health endpoint.
+                </p>
+                <button type="submit" class="btn btn-primary" style="width:auto">Connect</button>
+              </form>
+            `}
+          </div>
+
+          <div class="card">
+            <div class="card-header"><span class="card-title">Notifications</span></div>
+            <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+              Configure email (SMTP) for invites and ticket alerts, and an optional webhook for ticket events.
+            </p>
+            <div id="smtpMsg"></div>
+            <form id="smtpForm">
+              <div class="form-group">
+                <label>SMTP Host</label>
+                <input type="text" id="smtpHost" value="${escapeHtml(smtp.smtp_host)}" placeholder="smtp.gmail.com" style="font-family:var(--mono);font-size:12px">
               </div>
-              <p style="color:var(--text-dim);font-size:12px;margin-bottom:12px">
-                Open Claude Code Desktop &rarr; the 6-digit pairing code is shown on startup or in the health endpoint.
-              </p>
-              <button type="submit" class="btn btn-primary" style="width:auto">Connect</button>
+              <div class="form-group">
+                <label>Port</label>
+                <input type="text" id="smtpPort" value="${escapeHtml(smtp.smtp_port)}" placeholder="587" style="font-family:var(--mono);font-size:12px;max-width:100px">
+              </div>
+              <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="smtpUser" value="${escapeHtml(smtp.smtp_user)}" placeholder="you@gmail.com" style="font-family:var(--mono);font-size:12px">
+              </div>
+              <div class="form-group">
+                <label>Password ${smtp.smtp_pass_set ? '<span class="badge badge-green" style="margin-left:6px;font-size:10px">set</span>' : ''}</label>
+                <input type="password" id="smtpPass" placeholder="${smtp.smtp_pass_set ? 'Leave blank to keep' : 'App password'}" style="font-family:var(--mono);font-size:12px">
+              </div>
+              <div class="form-group">
+                <label>From Address</label>
+                <input type="text" id="smtpFrom" value="${escapeHtml(smtp.smtp_from)}" placeholder='"Kahalany.Dev" <hello@kahalany.dev>' style="font-family:var(--mono);font-size:12px">
+              </div>
+              <div style="display:flex;gap:8px">
+                <button type="submit" class="btn btn-primary" style="width:auto">Save SMTP</button>
+                <button type="button" class="btn btn-secondary" id="smtpTestBtn" style="width:auto">Send Test Email</button>
+              </div>
             </form>
-          `}
+            <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:20px">
+              <h4 style="font-size:14px;margin-bottom:8px">Ticket Webhook</h4>
+              <p style="color:var(--text-dim);font-size:12px;margin-bottom:12px">POST a JSON payload to this URL when a client creates a ticket. Works with Slack, Discord, or custom endpoints.</p>
+              <form id="webhookForm" style="display:flex;gap:8px">
+                <input type="url" id="webhookUrl" value="${escapeHtml(smtp.ticket_webhook_url)}" placeholder="https://hooks.slack.com/services/..." style="flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:12px">
+                <button type="submit" class="btn btn-primary" style="width:auto">Save</button>
+              </form>
+              <div id="webhookMsg" style="margin-top:8px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Dev Keys</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">
+              HMAC API keys for Claude Code integration. Use these to connect the portal sync service.
+            </p>
+            <div id="devKeysMsg"></div>
+            ${devKeys.length ? `
+            <div class="table-wrap" style="margin-bottom:20px">
+              <table class="mobile-cards">
+                <thead><tr><th>Key ID</th><th>Label</th><th>Status</th><th>Last Used</th><th></th></tr></thead>
+                <tbody>
+                  ${devKeys.map(k => `<tr>
+                    <td data-label="Key ID"><code style="font-family:var(--mono);font-size:12px">${escapeHtml(k.key_id)}</code></td>
+                    <td data-label="Label">${escapeHtml(k.label || '-')}</td>
+                    <td data-label="Status">${k.revoked ? '<span class="badge badge-red">revoked</span>' : (k.expires_at && new Date(k.expires_at) < new Date() ? '<span class="badge badge-yellow">expired</span>' : '<span class="badge badge-green">active</span>')}</td>
+                    <td data-label="Last Used">${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'never'}</td>
+                    <td data-label="">${!k.revoked ? `<button class="btn btn-danger btn-sm" data-revoke-key="${escapeHtml(k.key_id)}">Revoke</button>` : ''}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>` : '<p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">No dev keys yet.</p>'}
+            <div style="border-top:1px solid var(--border);padding-top:20px">
+              <h4 style="font-size:14px;margin-bottom:12px">Create New Key</h4>
+              <form id="createDevKeyForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+                <div style="flex:1;min-width:200px">
+                  <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Label</label>
+                  <input type="text" id="devKeyLabel" placeholder="e.g. Claude Code Desktop" style="width:100%;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+                </div>
+                <div style="min-width:120px">
+                  <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Expires</label>
+                  <select id="devKeyExpiry" style="width:100%;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+                    <option value="">Never</option>
+                    <option value="30">30 days</option>
+                    <option value="90" selected>90 days</option>
+                    <option value="365">1 year</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:auto">Generate Key</button>
+              </form>
+              <div id="devKeyResult" style="margin-top:12px"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Dev API Diagnostics</span>
+              <button class="btn btn-secondary btn-sm" id="runDevDiagBtn">Run Check</button>
+            </div>
+            <div id="devDiagResult" style="font-size:13px;color:var(--text-secondary)">Click "Run Check" to verify the dev API is working and see recent ticket resolution activity.</div>
+          </div>
+        </div>
+
+        <div class="settings-section-label">Team Management</div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Users</span>
+          </div>
+          <div id="usersMsg"></div>
+          <div class="table-wrap" style="margin-bottom:20px">
+            <table class="mobile-cards">
+              <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                ${users.map(u => {
+                  const roleBadge = u.role === 'admin' ? '<span class="badge badge-blue">admin</span>'
+                    : u.role === 'staff' ? '<span class="badge badge-purple" style="background:rgba(168,85,247,0.15);color:#c084fc">staff</span>'
+                    : '<span class="badge badge-green">client</span>';
+                  return `<tr>
+                  <td data-label="Email">${escapeHtml(u.email)}</td>
+                  <td data-label="Name">${escapeHtml(u.name || '-')}</td>
+                  <td data-label="Role">${roleBadge}</td>
+                  <td data-label="Status">${u.must_change_password ? '<span class="badge badge-yellow">pending</span>' : '<span class="badge badge-green">active</span>'}</td>
+                  <td data-label="">${u.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" data-reset-user="${u.id}" style="margin-right:4px">Reset PW</button><button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Remove</button>` : '<span class="badge badge-blue">you</span>'}</td>
+                </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:20px">
+            <h4 style="font-size:14px;margin-bottom:12px">Add New Admin</h4>
+            <form id="addUserForm" style="display:flex;gap:8px;flex-wrap:wrap">
+              <input type="email" id="newUserEmail" placeholder="Email" required style="flex:1;min-width:200px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+              <input type="text" id="newUserName" placeholder="Name (optional)" style="flex:1;min-width:150px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font)">
+              <button type="submit" class="btn btn-primary" style="width:auto">Add Admin</button>
+            </form>
+            <div id="newUserResult" style="margin-top:12px"></div>
+          </div>
         </div>
       `;
 
@@ -2977,7 +2977,7 @@ if ('serviceWorker' in navigator) {
     app.innerHTML = `
       <div class="login-page">
         <div class="login-card">
-          <div class="login-logo"><span class="accent">{</span> kahalany.dev <span class="accent">}</span></div>
+          <div class="login-logo"><span class="accent">{</span> kaymen.dev <span class="accent">}</span></div>
           <h2 class="login-title">Set Up Your Password</h2>
           <div id="inviteMsg"><div class="loading"><div class="spinner"></div> Validating invite...</div></div>
           <form id="inviteForm" style="display:none">

@@ -1,7 +1,7 @@
 {
-  "name": "Kahalany.Dev Admin",
+  "name": "kaymen.dev Admin",
   "short_name": "KD Admin",
-  "description": "Admin panel for kahalany.dev",
+  "description": "Admin panel for kaymen.dev",
   "start_url": "/admin/",
   "display": "standalone",
   "background_color": "#09090b",
