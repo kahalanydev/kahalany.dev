@@ -792,6 +792,260 @@ Replaced the full-width activity feed with a 2-column widget layout below the he
 
 ---
 
+## 2026-03-30 — Dev API Expansion & Inline Ticket Management
+
+### Dev API New Endpoints (`server/routes/dev.js`)
+- **`POST /api/dev/bootstrap`** — Creates an organization + project in one HMAC-authenticated call. Idempotent: returns existing org/project IDs if names match. Allows Claude Code or automation scripts to onboard a new client without the admin panel.
+- **`POST /api/dev/projects/:id/update`** — Updates project metadata (status, progress, dates, description, tech_stack, live_url). Whitelist-based field filtering. Logs `project_status_changed` activity.
+- **`POST /api/dev/projects/:id/milestones`** — Bulk creates milestones with optional `replace: true` to wipe and rebuild. Auto-recalculates project progress. Returns created milestones + new progress percent.
+
+### Admin Ticket Inline Status Change
+- Project detail ticket table now has `<select>` dropdowns for instant status change (open → in_progress → review → completed → closed) without navigating to ticket detail
+- Fires `PATCH /api/admin/tickets/:id` immediately on change, rolls back on failure
+- Row-click navigation blocked when interacting with the dropdown
+
+### Dev API Diagnostics (`admin/app.js` + `server/routes/admin.js`)
+- New `GET /api/admin/dev-api-status` endpoint: returns active dev keys, recent ticket resolutions, and open tickets
+- "Dev API Diagnostics" card in admin Settings: shows active key count (with red warning if zero), per-key usage timestamps, recent resolutions with time-ago labels, open ticket list with clickable links
+- "Run Check" button for on-demand verification of the dev API pipeline
+
+### Ticket Update Verification
+- PATCH endpoint now returns `500` when `result.changes === 0` instead of silently succeeding
+- Returns full updated ticket object for frontend verification
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/routes/dev.js` | Bootstrap, project update, bulk milestones endpoints (~130 lines added) |
+| `server/routes/admin.js` | Dev API status endpoint, ticket update verification |
+| `admin/app.js` | Inline ticket status, Dev API Diagnostics card |
+
+---
+
+## 2026-03-30 — Maintenance Phase & Portal Fixes
+
+### Maintenance Phase
+- Added `maintenance` as the 7th project lifecycle phase (after `completed`) in portal phase indicator
+- Phase bar now renders: Planning → Proposed → Approved → In Progress → Review → Completed → Maintenance
+- Status and type badge maps updated for maintenance
+
+### Portal Plan Page Fix
+- Removed `white-space: pre-wrap` from `.plan-content` — plan content is now markdown-rendered into proper HTML, the pre-wrap was causing raw line-break formatting instead of clean document layout
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `portal/app.js` | Maintenance phase in phaseSteps array, badge maps |
+| `portal/styles.css` | Removed pre-wrap from `.plan-content` |
+
+---
+
+## 2026-03-30 — Mobile Overhaul & PWA Support
+
+### Mobile Card Tables
+- New `.mobile-cards` CSS pattern: at ≤768px, tables transform into card-per-row layout
+- `thead` hidden, each `td` becomes `display: flex` row with column header prepended via `content: attr(data-label)` pseudo-element
+- Applied to all tables in admin and portal (users, tickets, visitors, etc.)
+- `data-label` attributes added to all `<td>` elements
+
+### Bottom Navigation Bar
+- Fixed bottom nav replacing the sidebar on mobile (≤768px)
+- 5 main nav items with icon + label, stacked vertically per item
+- Active state: accent color, `scale(1.1)` icon animation
+- Press feedback: `transform: scale(0.88)` on `:active` for tap response
+- `env(safe-area-inset-bottom)` padding for iPhone notch safety
+- `-webkit-tap-highlight-color: transparent` to suppress iOS blue flash
+- Settings accessible via gear icon in the mobile top bar (not in bottom nav)
+
+### Mobile Top Bar
+- Fixed top-right bar (hidden on desktop) with theme toggle, settings gear, and logout button
+
+### Layout Fixes
+- `html, body { overflow-x: hidden; max-width: 100vw }` to prevent horizontal scroll bleed
+- `-webkit-text-size-adjust: 100%` to prevent iOS text auto-resize
+- Filter tabs: `overflow-x: auto` with `-webkit-overflow-scrolling: touch`
+- Admin metrics grid: forces 2 columns at ≤768px (was collapsing to single column)
+
+### PWA Support
+- **Manifests**: `admin/manifest.json` and `portal/manifest.json` with `display: standalone`, dark theme colors, favicon as icon
+- **Service workers**: `admin/sw.js` and `portal/sw.js` with cache strategies:
+  - Navigation requests: pass through untouched (critical for OAuth redirects)
+  - API/auth calls: network-first with cache fallback
+  - Static assets: stale-while-revalidate
+- **HTML meta tags**: viewport-fit=cover, theme-color, apple-mobile-web-app-capable, apple-mobile-web-app-status-bar-style, apple-mobile-web-app-title
+- **Theme-color sync**: `applyTheme()` updates `<meta name="theme-color">` to match current theme
+- **OAuth fix**: Service worker initially intercepted OAuth callback navigations — fixed to skip all navigate requests entirely
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `admin/manifest.json` | PWA manifest for admin panel |
+| `portal/manifest.json` | PWA manifest for client portal |
+| `admin/sw.js` | Admin service worker (caching + OAuth passthrough) |
+| `portal/sw.js` | Portal service worker (caching) |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `admin/index.html` | PWA meta tags, manifest link, viewport-fit |
+| `portal/index.html` | PWA meta tags, manifest link, viewport-fit |
+| `admin/app.js` | Bottom nav, mobile top bar, data-label attributes, SW registration, theme-color sync |
+| `portal/app.js` | Bottom nav, mobile top bar, data-label attributes, SW registration |
+| `admin/styles.css` | `.mobile-cards`, `.bottom-nav`, `.mobile-top-bar`, metrics grid 2-col, tap feedback |
+| `portal/styles.css` | `.mobile-cards`, `.bottom-nav`, `.mobile-top-bar`, tap feedback |
+
+---
+
+## 2026-03-30 — Contact-to-Client Pipeline & Spam Protection
+
+### Honeypot Spam Protection
+- Hidden `_hp` field added to contact form — bots filling all fields get a silent `{ success: true }` (no error signal)
+- Timing check: form sends `_t` (milliseconds since page load) — submissions under 2 seconds silently succeed (no human can fill the form that fast)
+
+### Contact Form Enhancement
+- New optional "What are you building?" text input (`project_name` field)
+- Email notification to hello@kahalany.dev now includes project name when provided
+
+### Lead Conversion Tracking (DB schema)
+- `contact_submissions` table gained three new columns via `safeAlter`:
+  - `project_name TEXT` — what the lead wants to build
+  - `converted_at TEXT` — timestamp when lead was converted to a client org
+  - `converted_org_id TEXT` — the org ID the lead was converted into
+- Prepared for a future "Convert to Client" button in admin dashboard
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `server/index.js` | Honeypot + timing validation in POST /api/contact, project_name column migration |
+| `server/db.js` | safeAlter for project_name, converted_at, converted_org_id columns |
+| `index.html` | Hidden honeypot field, timing field, project_name input |
+| `script.js` | Capture load time, compute elapsed time, send _hp + _t in POST body |
+| `styles.css` | Honeypot field hidden styling |
+
+---
+
+## 2026-03-30 — Portfolio Update: Client Management Platform
+
+### New Portfolio Card
+- Added 9th project card: "Client Management Platform" showcasing the admin panel + client portal system built for this site
+- Category: Web Apps. Tech tags: Node.js, SQLite, Vanilla JS, JWT
+- Status badge: "Live" (purple)
+- Feature tags: Admin + Portal, Google OAuth, Visitor analytics, Ticket system, Plan approvals, PWA
+- CSS device mockup (`.mockup-cmp`): purple accent, sidebar, 2-column admin layout with metric cards, project table row with progress bar, ticket detail preview
+
+### Hero Stats Updated
+- Production Apps counter: 12+ → 15+
+- Live Platforms counter: 5 → 6
+
+### Settings Page Reorganization (uncommitted)
+- Settings page divided into labeled sections with `.settings-section-label` dividers:
+  - **Account & Security**: Change Password + Google OAuth (grid-2)
+  - **Integrations**: Claude Code + Notifications/SMTP/Webhook (grid-2)
+  - Dev Keys + Dev API Diagnostics (grid-2)
+  - **Team Management**: Users table (full-width)
+- New `.settings-section-label` CSS: uppercase, letter-spacing, dim color, bottom border
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `index.html` | CMP portfolio card, hero stat updates (15+, 6) |
+| `styles.css` | `.mockup-cmp` CSS device mockup |
+| `admin/app.js` | Settings page sectioned layout reorganization (uncommitted) |
+| `admin/styles.css` | `.settings-section-label` styles (uncommitted) |
+
+---
+
+## 2026-04-06 — Rebrand: kahalany.dev → kaymen.dev (Plan B)
+
+### Context
+Rebranded the dev practice from "Kahalany.Dev" to "kaymen.dev", operating under Kaymen Group LLC. Chose Plan B (frontend-only rebrand) — all user-facing references updated, internal plumbing left as-is. Domain kaymen.dev was already purchased.
+
+### DNS & Infrastructure
+
+#### Cloudflare DNS (kaymen.dev zone)
+- Added wildcard A record: `*` → `178.156.245.71` (DNS only)
+- Added root A record: `@` → `178.156.245.71` (DNS only)
+- Wildcard covers all current + future subdomains automatically
+
+#### Cloudflare Email Routing
+- Enabled for kaymen.dev zone
+- `hello@kaymen.dev` forwards to Gmail inbox
+
+#### Cloudflare Tunnel
+- Added `code.kaymen.dev` as public hostname on existing `claude-code` tunnel
+- Routes to `http://localhost:3141` (same as code.kahalany.dev)
+- CNAME auto-created by Cloudflare
+
+#### Coolify FQDN Updates (via API)
+Added kaymen.dev domains alongside existing kahalany.dev for all 7 production apps:
+
+| App | UUID | Updated FQDN |
+|-----|------|-------------|
+| Main site | `zcco40skss0o8wwocs40k4gs` | `kahalany.dev, kaymen.dev` |
+| NodeAI | `gw840cgk8gscowck8kc80wo8` | `nodeai.kahalany.dev, nodeai.kaymen.dev` |
+| Predictable | `og8w4kkkccw4ckcsgw4ws8sw` | `predictable.kahalany.dev, predictable.kaymen.dev` |
+| Davenen | `cco0kccokg08okwsw8cssk48` | `davenen.kahalany.dev, davenen.kaymen.dev` |
+| ShipHero AI | `o00gossow4c8s888ws48okso` | `shipai.kahalany.dev, shipai.kaymen.dev` |
+| PCG | `nwg0s00oc8k8owo0sggkgkgg` | `pcg.kahalany.dev, pcg.kaymen.dev` |
+| Torah Tracker | `dc4ccksssskkww0ckc00sg4s` | `torahtracker.app, torahtracker.kahalany.dev, torahtracker.kaymen.dev` |
+
+- All apps restarted via API to trigger Traefik label regeneration + Let's Encrypt cert provisioning
+- SSL certs issued by Let's Encrypt (certresolver=letsencrypt) for all kaymen.dev domains
+
+### Code Changes (Plan B — frontend-only, 9 files)
+
+#### index.html
+- Page title → `kaymen.dev — Custom Software Solutions`
+- Mockup URLs: nodeai, predictable, davenen → `*.kaymen.dev`
+- Live link hrefs: nodeai, predictable, davenen → `*.kaymen.dev`
+- ShipHero AI: mockup URL → `shipai.kaymen.dev` + added "View Live" link
+- PCG: mockup URL → `pcg.kaymen.dev` + added "View Live" link
+- Contact email display + mailto → `hello@kaymen.dev`
+- Footer logo → `{ kaymen.dev }`
+- Copyright → `© 2026 Kaymen Group LLC`
+
+#### admin/app.js
+- 4 login/sidebar logo instances → `kaymen.dev`
+- Device name → `Kaymen Admin Panel`
+- Claude Code server URL → `code.kaymen.dev`
+
+#### portal/app.js
+- 4 login/sidebar logo instances → `kaymen.dev`
+
+#### admin/index.html + portal/index.html
+- Page titles → `kaymen.dev`
+
+#### admin/manifest.json + portal/manifest.json
+- PWA names → `kaymen.dev Admin` / `kaymen.dev Portal`
+- PWA descriptions → `kaymen.dev`
+
+#### server/utils/email.js
+- Email HTML logo: `kahalany` → `kaymen`
+- Invite subject: `kaymen.dev`
+- Password reset subject: `kaymen.dev`
+
+#### server/routes/dev.js
+- Default org email → `hello@kaymen.dev`
+- Portal URL → `https://kaymen.dev/portal`
+
+### What Was Left As-Is (Plan B scope)
+- Code comments in 5 files (nobody sees these)
+- package.json/package-lock.json name (internal npm identifier)
+- GitHub repo/org name (internal, redirects work)
+- server/index.js contact form `to:` email (forwards regardless of brand)
+- server/routes/auth.js SMTP test subject (admin-only)
+- admin/app.js SMTP placeholder text (admin-only)
+- Docker volume name (renaming risks data loss)
+- server/db.js admin seed email (personal Gmail)
+
+### Still TODO
+- [ ] Update SMTP "From" field in Admin → Settings → Integrations to `"kaymen.dev" <hello@kaymen.dev>`
+- [ ] Phase 4: Retire old kahalany.dev domain (301 redirects via Cloudflare when ready)
+- [ ] Optional: Plan A internal cleanup (comments, package.json, GitHub rename)
+- [ ] Update Claude Code Desktop allowed origins to include kaymen.dev
+
+---
+
 ## Future Enhancements
 - [ ] Add real screenshots alongside or replacing CSS mockups
 - [x] ~~Add more contact methods (phone, WhatsApp, Calendly)~~ — Added WhatsApp + contact form
@@ -803,3 +1057,6 @@ Replaced the full-width activity feed with a 2-column widget layout below the he
 - [ ] Add email alerts for high-severity suspicious activity
 - [ ] Add data export (CSV) from admin panel
 - [ ] Add real-time WebSocket updates to admin dashboard
+- [ ] Convert lead to client button in admin dashboard (schema ready)
+- [x] ~~Add PWA support~~ — Added manifests + service workers for admin and portal
+- [x] ~~Mobile responsive overhaul~~ — Card tables, bottom nav, mobile top bar
